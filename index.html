@@ -1,0 +1,385 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import { Check, Plus, Flame, Trash2, Star, Zap, Trophy, ListTodo, X, PlusCircle } from 'lucide-react';
+
+// --- XP PROGRESSION DATA (0-50) ---
+const XP_TABLE = [
+  12, 15, 18, 22, 26, 30, 36, 44, 54, 66, 80, // 0-10
+  96, 114, 135, 160, 188, 220, 256, 296, 340, 390, // 11-20
+  445, 505, 570, 640, 715, 795, 880, 970, 1065, 1165, // 21-30
+  1270, 1380, 1495, 1615, 1740, 1870, 2005, 2145, 2290, 2440, // 31-40
+  2595, 2755, 2920, 3090, 3265, 3445, 3630, 3820, 4015, 4215 // 41-50
+];
+
+const getXpRequired = (level) => {
+  if (level < XP_TABLE.length) return XP_TABLE[level];
+  return XP_TABLE[XP_TABLE.length - 1] + (level - 50) * 200;
+};
+
+const getRewardBase = (level) => {
+  if (level <= 5) return 6;
+  if (level <= 10) return 7;
+  if (level <= 15) return 9;
+  if (level <= 20) return 12;
+  if (level <= 30) return 16;
+  if (level <= 40) return 20;
+  return 25;
+};
+
+const App = () => {
+  // --- STATE ---
+  const [level, setLevel] = useState(0);
+  const [xp, setXp] = useState(0);
+  const [activeTab, setActiveTab] = useState('habits');
+  const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
+  const [lastCheckDate, setLastCheckDate] = useState(new Date().toISOString().split('T')[0]);
+  
+  const [habits, setHabits] = useState([
+    { id: 1, text: 'Morning Meditation', streak: 5, lastCompleted: null },
+    { id: 2, text: 'Drink 2L Water', streak: 2, lastCompleted: null }
+  ]);
+  const [todos, setTodos] = useState([
+    { id: 1, text: 'Finish project report', important: true, completed: false }
+  ]);
+  
+  const [feedback, setFeedback] = useState([]);
+  const [showLevelUp, setShowLevelUp] = useState(false);
+
+  // --- DAILY RESET LOGIC ---
+  useEffect(() => {
+    const checkDailyReset = () => {
+      const today = new Date().toISOString().split('T')[0];
+      const savedDate = localStorage.getItem('last_productivity_date');
+
+      if (savedDate && savedDate !== today) {
+        setTodos([]);
+        console.log("Midnight Reset: To-Do list cleared.");
+      }
+      
+      setLastCheckDate(today);
+      localStorage.setItem('last_productivity_date', today);
+    };
+
+    checkDailyReset();
+    const interval = setInterval(checkDailyReset, 60000); 
+    return () => clearInterval(interval);
+  }, []);
+
+  // --- XP LOGIC ---
+  const addXp = useCallback((amount) => {
+    setXp(prevXp => {
+      let newXp = prevXp + amount;
+      let currentLevel = level;
+      let xpRequired = getXpRequired(currentLevel);
+
+      if (newXp >= xpRequired) {
+        newXp -= xpRequired;
+        setLevel(l => l + 1);
+        setShowLevelUp(true);
+        setTimeout(() => setShowLevelUp(false), 2000);
+      }
+      return Math.max(0, newXp);
+    });
+
+    const id = Date.now();
+    setFeedback(prev => [...prev, { id, text: `+${amount} XP`, x: Math.random() * 40 + 30 }]);
+    setTimeout(() => {
+      setFeedback(prev => prev.filter(f => f.id !== id));
+    }, 1000);
+  }, [level]);
+
+  const removeXp = (amount) => {
+    setXp(prev => Math.max(0, prev - amount));
+  };
+
+  // --- ACTIONS ---
+  const toggleHabit = (id) => {
+    const today = new Date().toISOString().split('T')[0];
+    setHabits(prev => prev.map(h => {
+      if (h.id === id) {
+        if (h.lastCompleted === today) return h;
+        const base = getRewardBase(level);
+        const bonus = Math.round(h.streak * 0.5);
+        addXp(base + bonus);
+        return { ...h, streak: h.streak + 1, lastCompleted: today };
+      }
+      return h;
+    }));
+  };
+
+  const addHabit = (text) => {
+    if (!text) return;
+    setHabits([...habits, { id: Date.now(), text, streak: 0, lastCompleted: null }]);
+    setIsAddMenuOpen(false);
+  };
+
+  const deleteHabit = (id) => setHabits(habits.filter(h => h.id !== id));
+
+  const toggleTodo = (id) => {
+    setTodos(prev => prev.map(t => {
+      if (t.id === id) {
+        const base = getRewardBase(level);
+        const reward = t.important ? Math.round(base * 1.5) : Math.round(base * 0.75);
+        if (!t.completed) {
+          addXp(reward);
+        } else {
+          removeXp(reward);
+        }
+        return { ...t, completed: !t.completed };
+      }
+      return t;
+    }));
+  };
+
+  const addTodo = (text, important = false) => {
+    if (!text) return;
+    setTodos([...todos, { id: Date.now(), text, important, completed: false }]);
+    setIsAddMenuOpen(false);
+  };
+
+  const deleteTodo = (id) => setTodos(todos.filter(t => t.id !== id));
+
+  const xpRequired = getXpRequired(level);
+  const progressPercent = (xp / xpRequired) * 100;
+
+  return (
+    <div className="relative min-h-screen text-[#e0e0e0] font-mono selection:bg-purple-500 flex flex-col items-center p-4 overflow-x-hidden">
+      {/* BACKGROUND IMAGE WITH OVERLAY */}
+      <div 
+        className="fixed inset-0 z-[-1] bg-cover bg-center bg-no-repeat transition-all duration-700"
+        style={{ backgroundImage: `url('https://i.pinimg.com/originals/ed/a5/73/eda5739966cb33768d8ad0d77d7307ce.gif')` }}
+      >
+        <div className="absolute inset-0 bg-black/60" /> {/* Dark overlay for readability */}
+      </div>
+
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
+        body { font-family: 'VT323', monospace; letter-spacing: 0.05em; font-size: 1.25rem; }
+        .pixel-border { border: 4px solid #333; box-shadow: 4px 4px 0px #000; }
+        .pixel-btn:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0px #000; }
+        .glass-panel { background: rgba(30, 30, 30, 0.85); backdrop-filter: blur(4px); }
+        .floating-xp { animation: floatUp 1s ease-out forwards; }
+        @keyframes floatUp {
+          0% { transform: translateY(0); opacity: 1; }
+          100% { transform: translateY(-50px); opacity: 0; }
+        }
+        .level-pulse { animation: pulse 0.5s infinite; }
+        @keyframes pulse {
+          0%, 100% { text-shadow: 0 0 10px #a855f7; transform: scale(1); }
+          50% { text-shadow: 0 0 20px #a855f7; transform: scale(1.1); }
+        }
+      `}</style>
+
+      {/* HEADER / STATS */}
+      <header className="w-full max-w-md mb-8 sticky top-0 pt-4 z-10">
+        <div className="glass-panel p-4 pixel-border mb-2">
+          <div className="flex justify-between items-start mb-4">
+            <div className="flex flex-col">
+              <span className="text-gray-400 text-sm uppercase tracking-widest">Player Profile</span>
+              <h1 className={`text-4xl font-bold ${showLevelUp ? 'level-pulse text-purple-400' : 'text-white'}`}>
+                LV. {level}
+              </h1>
+            </div>
+            <button 
+              onClick={() => setIsAddMenuOpen(true)}
+              className="pixel-border bg-purple-600 p-2 pixel-btn hover:bg-purple-500 flex items-center gap-2"
+            >
+              <Plus size={20} /> <span className="hidden sm:inline font-bold">ADD</span>
+            </button>
+          </div>
+          
+          {/* XP BAR */}
+          <div className="w-full h-6 bg-[#333]/50 pixel-border relative overflow-hidden mb-2">
+            <div 
+              className="h-full bg-purple-500 transition-all duration-500 ease-out shadow-[0_0_15px_rgba(168,85,247,0.5)]" 
+              style={{ width: `${progressPercent}%` }}
+            />
+          </div>
+          <div className="flex justify-between items-center text-gray-300 text-sm">
+            <span>Base: {getRewardBase(level)} XP</span>
+            <span className="font-bold">{xp} / {xpRequired} XP</span>
+          </div>
+        </div>
+
+        {/* FEEDBACK OVERLAY */}
+        {feedback.map(f => (
+          <div 
+            key={f.id} 
+            className="fixed floating-xp text-yellow-400 font-bold text-3xl z-50 pointer-events-none drop-shadow-md"
+            style={{ left: `${f.x}%`, top: '15%' }}
+          >
+            {f.text}
+          </div>
+        ))}
+
+        {showLevelUp && (
+          <div className="fixed top-1/4 left-1/2 -translate-x-1/2 text-6xl text-purple-400 font-bold level-pulse z-50 pointer-events-none drop-shadow-lg">
+            LEVEL UP!
+          </div>
+        )}
+      </header>
+
+      {/* ADD MENU MODAL */}
+      {isAddMenuOpen && (
+        <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+          <div className="bg-[#1e1e1e] pixel-border w-full max-w-sm p-6 relative">
+            <button 
+              onClick={() => setIsAddMenuOpen(false)}
+              className="absolute top-4 right-4 text-gray-500 hover:text-white"
+            >
+              <X size={24} />
+            </button>
+            
+            <h2 className="text-2xl font-bold mb-6 border-b border-gray-800 pb-2 uppercase tracking-widest text-purple-400">New Mission</h2>
+            
+            <div className="space-y-8">
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                addHabit(e.target.habit.value);
+                e.target.reset();
+              }} className="space-y-2">
+                <label className="text-orange-400 flex items-center gap-2 text-sm uppercase font-bold"><Zap size={16}/> Daily Habit</label>
+                <div className="flex gap-2">
+                  <input 
+                    name="habit" 
+                    placeholder="E.g. Exercise" 
+                    className="flex-grow bg-[#121212] pixel-border p-2 focus:outline-none focus:border-orange-500 text-white"
+                  />
+                  <button type="submit" className="bg-orange-600 p-2 pixel-border pixel-btn font-bold">ADD</button>
+                </div>
+              </form>
+
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                const text = e.target.todo.value;
+                const imp = e.target.important.checked;
+                addTodo(text, imp);
+                e.target.reset();
+              }} className="space-y-2">
+                <label className="text-blue-400 flex items-center gap-2 text-sm uppercase font-bold"><ListTodo size={16}/> Task</label>
+                <div className="flex gap-2">
+                  <input 
+                    name="todo" 
+                    placeholder="E.g. Call client" 
+                    className="flex-grow bg-[#121212] pixel-border p-2 focus:outline-none focus:border-blue-500 text-white"
+                  />
+                  <button type="submit" className="bg-blue-600 p-2 pixel-border pixel-btn font-bold">ADD</button>
+                </div>
+                <label className="flex items-center gap-2 cursor-pointer group text-sm text-gray-400 mt-2">
+                  <input type="checkbox" name="important" className="hidden peer" />
+                  <div className="w-5 h-5 pixel-border border-2 bg-gray-800 peer-checked:bg-yellow-500 flex items-center justify-center">
+                    <Star size={12} className="text-white" />
+                  </div>
+                  High Priority (+50% XP)
+                </label>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MAIN CONTENT */}
+      <main className="w-full max-w-md flex-grow mb-24 space-y-6">
+        {activeTab === 'habits' ? (
+          <section className="space-y-4">
+            <div className="flex justify-between items-center border-b-4 border-orange-600/50 pb-2">
+              <h2 className="text-2xl flex items-center gap-2 text-orange-400 font-bold drop-shadow-md"><Zap size={22}/> DAILY HABITS</h2>
+            </div>
+            
+            {habits.length === 0 ? (
+              <div className="glass-panel p-8 pixel-border text-center text-gray-400 italic">
+                Add a habit via the menu above
+              </div>
+            ) : habits.map(habit => {
+              const today = new Date().toISOString().split('T')[0];
+              const isDone = habit.lastCompleted === today;
+              return (
+                <div key={habit.id} className={`p-4 pixel-border flex items-center justify-between transition-all ${isDone ? 'bg-green-900/40 opacity-70 scale-95' : 'glass-panel hover:bg-[#2a2a2a]/90'}`}>
+                  <div className="flex flex-col">
+                    <span className={`text-xl font-bold ${isDone ? 'line-through text-gray-500' : 'text-white'}`}>{habit.text}</span>
+                    <span className="text-orange-400 text-sm flex items-center gap-1 font-bold">
+                      <Flame size={14} className="fill-current" /> {habit.streak} DAY STREAK
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button 
+                      onClick={() => toggleHabit(habit.id)}
+                      disabled={isDone}
+                      className={`p-2 pixel-border pixel-btn ${isDone ? 'bg-green-800 border-green-900 cursor-default' : 'bg-gray-700 hover:bg-gray-600'}`}
+                    >
+                      {isDone ? <Check size={28} className="text-green-400" /> : <Plus size={28} />}
+                    </button>
+                    <button onClick={() => deleteHabit(habit.id)} className="p-2 text-gray-500 hover:text-red-500 transition-colors">
+                      <Trash2 size={20} />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </section>
+        ) : (
+          <section className="space-y-4">
+            <div className="flex justify-between items-center border-b-4 border-blue-600/50 pb-2">
+              <h2 className="text-2xl flex items-center gap-2 text-blue-400 font-bold drop-shadow-md"><ListTodo size={22}/> TO-DO LIST</h2>
+            </div>
+            
+            <div className="glass-panel border-2 border-blue-600/50 p-2 text-[12px] text-center text-blue-300 uppercase tracking-widest mb-4 font-bold">
+              SYSTEM: CLEARING ALL TASKS AT MIDNIGHT
+            </div>
+
+            {todos.length === 0 ? (
+              <div className="glass-panel p-8 pixel-border text-center text-gray-400 italic">
+                All missions accomplished!
+              </div>
+            ) : todos.map(todo => (
+              <div key={todo.id} className={`p-4 pixel-border flex items-center justify-between transition-all ${todo.completed ? 'bg-blue-900/40 opacity-70 scale-95' : 'glass-panel hover:bg-[#2a2a2a]/90'}`}>
+                <div className="flex items-center gap-3">
+                  <button 
+                    onClick={() => toggleTodo(todo.id)}
+                    className={`w-10 h-10 pixel-border flex items-center justify-center ${todo.completed ? 'bg-blue-600' : 'bg-gray-700'}`}
+                  >
+                    {todo.completed && <Check size={24} />}
+                  </button>
+                  <div className="flex flex-col">
+                    <span className={`text-xl font-bold ${todo.completed ? 'line-through text-gray-500' : 'text-white'} ${todo.important ? 'text-yellow-400 underline decoration-yellow-600' : ''}`}>
+                      {todo.text}
+                    </span>
+                    {todo.important && <span className="text-[12px] text-yellow-600 uppercase tracking-widest font-bold">CRITICAL PRIORITY</span>}
+                  </div>
+                </div>
+                <button onClick={() => deleteTodo(todo.id)} className="p-2 text-gray-500 hover:text-red-500 transition-colors">
+                  <Trash2 size={20} />
+                </button>
+              </div>
+            ))}
+          </section>
+        )}
+      </main>
+
+      {/* BOTTOM NAV */}
+      <nav className="fixed bottom-0 left-0 right-0 h-24 glass-panel border-t-4 border-[#333] flex items-center justify-around z-10 px-4">
+        <button 
+          onClick={() => setActiveTab('habits')}
+          className={`flex flex-col items-center gap-1 transition-all flex-1 py-2 ${activeTab === 'habits' ? 'text-orange-400 scale-110 drop-shadow-[0_0_8px_rgba(251,146,60,0.5)]' : 'text-gray-500'}`}
+        >
+          <Zap size={32} fill={activeTab === 'habits' ? 'currentColor' : 'none'} />
+          <span className="text-sm uppercase font-bold tracking-tighter">Habits</span>
+        </button>
+        <button 
+          onClick={() => setActiveTab('todo')}
+          className={`flex flex-col items-center gap-1 transition-all flex-1 py-2 ${activeTab === 'todo' ? 'text-blue-400 scale-110 drop-shadow-[0_0_8px_rgba(96,165,250,0.5)]' : 'text-gray-500'}`}
+        >
+          <ListTodo size={32} />
+          <span className="text-sm uppercase font-bold tracking-tighter">To-Do</span>
+        </button>
+      </nav>
+
+      {/* QUICK STATS FOOTER */}
+      <footer className="w-full max-w-md text-center text-gray-400 text-[12px] pb-28 flex justify-between px-4 uppercase font-bold tracking-widest drop-shadow-md">
+        <span className="flex items-center gap-1"><Trophy size={14}/> LV {level}</span>
+        <span>{habits.length + todos.length} MISSIONS LOGGED</span>
+      </footer>
+    </div>
+  );
+};
+
+export default App;
