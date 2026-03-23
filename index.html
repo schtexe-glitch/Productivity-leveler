@@ -9,6 +9,17 @@
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#0f172a">
 
+  <!-- Service Worker Registration -->
+  <script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("/sw.js")
+          .then(() => console.log("SW registered"))
+          .catch(err => console.log("SW error:", err));
+      });
+    }
+  </script>
+
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   
@@ -31,9 +42,7 @@
       0%, 100% { text-shadow: 0 0 10px #a855f7; transform: scale(1); }
       50% { text-shadow: 0 0 20px #a855f7; transform: scale(1.1); }
     }
-    /* Hide scrollbar for Chrome, Safari and Opera */
     .no-scrollbar::-webkit-scrollbar { display: none; }
-    /* Hide scrollbar for IE, Edge and Firefox */
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
   </style>
 </head>
@@ -157,13 +166,12 @@
   </footer>
 
   <script>
-    // --- XP PROGRESSION DATA (0-50) ---
     const XP_TABLE = [
-      12, 15, 18, 22, 26, 30, 36, 44, 54, 66, 80, // 0-10
-      96, 114, 135, 160, 188, 220, 256, 296, 340, 390, // 11-20
-      445, 505, 570, 640, 715, 795, 880, 970, 1065, 1165, // 21-30
-      1270, 1380, 1495, 1615, 1740, 1870, 2005, 2145, 2290, 2440, // 31-40
-      2595, 2755, 2920, 3090, 3265, 3445, 3630, 3820, 4015, 4215 // 41-50
+      12, 15, 18, 22, 26, 30, 36, 44, 54, 66, 80, 
+      96, 114, 135, 160, 188, 220, 256, 296, 340, 390, 
+      445, 505, 570, 640, 715, 795, 880, 970, 1065, 1165, 
+      1270, 1380, 1495, 1615, 1740, 1870, 2005, 2145, 2290, 2440, 
+      2595, 2755, 2920, 3090, 3265, 3445, 3630, 3820, 4015, 4215 
     ];
 
     const getXpRequired = (level) => {
@@ -181,7 +189,6 @@
       return 25;
     };
 
-    // --- STATE MANAGEMENT ---
     let state = {
       level: 0,
       xp: 0,
@@ -191,7 +198,6 @@
       showLevelUp: false
     };
 
-    // Save/Load from LocalStorage
     function saveState() {
       localStorage.setItem('leveler_save_data', JSON.stringify(state));
     }
@@ -201,7 +207,6 @@
       if (saved) {
         state = { ...state, ...JSON.parse(saved) };
       } else {
-        // Default starting data
         state.habits = [
           { id: 1, text: 'Drink 2L Water', streak: 0, lastCompleted: null },
           { id: 2, text: 'Morning Exercise', streak: 0, lastCompleted: null }
@@ -209,43 +214,34 @@
       }
     }
 
-    // Escape HTML
     const escapeHTML = (str) => str.replace(/[&<>'"]/g, tag => ({
       '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
     }[tag] || tag));
 
-    // --- DAILY RESET LOGIC ---
     function checkDailyReset() {
       const today = new Date().toDateString();
       const savedDate = localStorage.getItem('leveler_last_reset_date');
-
       if (savedDate && savedDate !== today) {
-        // Clear To-Dos
         state.todos = [];
         saveState();
-        console.log("Midnight system check: Mission list cleared.");
         render();
       }
       localStorage.setItem('leveler_last_reset_date', today);
     }
 
-    // --- ACTIONS ---
     function addXp(amount) {
       state.xp += amount;
       let xpRequired = getXpRequired(state.level);
-
       while (state.xp >= xpRequired) {
         state.xp -= xpRequired;
         state.level += 1;
         state.showLevelUp = true;
         xpRequired = getXpRequired(state.level);
-        
         setTimeout(() => {
           state.showLevelUp = false;
           render();
         }, 3000);
       }
-      
       showFeedback(`+${amount} XP`);
       saveState();
       render();
@@ -344,17 +340,12 @@
       render();
     }
 
-    // --- RENDER ENGINE ---
     function render() {
-      // Stats UI
       const levelEl = document.getElementById('level-display');
       levelEl.innerText = `LV. ${state.level}`;
       if (state.showLevelUp) {
         levelEl.classList.add('level-pulse', 'text-purple-400');
-        document.getElementById('level-up-container').innerHTML = `
-          <div class="fixed top-1/3 left-1/2 -translate-x-1/2 text-6xl text-purple-400 font-bold level-pulse z-50 pointer-events-none drop-shadow-lg text-center">
-            LEVEL UP!
-          </div>`;
+        document.getElementById('level-up-container').innerHTML = `<div class="fixed top-1/3 left-1/2 -translate-x-1/2 text-6xl text-purple-400 font-bold level-pulse z-50 pointer-events-none drop-shadow-lg text-center">LEVEL UP!</div>`;
       } else {
         levelEl.classList.remove('level-pulse', 'text-purple-400');
         document.getElementById('level-up-container').innerHTML = '';
@@ -366,7 +357,6 @@
       document.getElementById('base-xp-text').innerText = `Base Reward: ${getRewardBase(state.level)} XP`;
       document.getElementById('xp-text').innerText = `${state.xp} / ${xpReq} XP`;
 
-      // Tabs UI
       const habitsSec = document.getElementById('habits-section');
       const todosSec = document.getElementById('todos-section');
       const navHabits = document.getElementById('nav-habits');
@@ -384,7 +374,6 @@
         navTodos.className = 'flex flex-col items-center gap-1 transition-all flex-1 py-2 text-blue-400 scale-110 drop-shadow-[0_0_8px_rgba(96,165,250,0.5)]';
       }
 
-      // Habits Render
       const habitsList = document.getElementById('habits-list');
       if (state.habits.length === 0) {
         habitsList.innerHTML = `<div class="glass-panel p-8 pixel-border text-center text-gray-500 italic">No habits tracking.</div>`;
@@ -392,60 +381,26 @@
         const today = new Date().toDateString();
         habitsList.innerHTML = state.habits.map(h => {
           const isDone = h.lastCompleted === today;
-          return `
-            <div class="p-4 pixel-border flex items-center justify-between transition-all ${isDone ? 'bg-green-900/20 opacity-60 scale-95' : 'glass-panel'}">
-              <div class="flex flex-col">
-                <span class="text-xl font-bold ${isDone ? 'line-through text-gray-500' : 'text-white'}">${escapeHTML(h.text)}</span>
-                <span class="text-orange-400 text-sm flex items-center gap-1 font-bold">
-                  <i data-lucide="flame" width="14" height="14"></i> ${h.streak} DAY STREAK
-                </span>
-              </div>
-              <div class="flex items-center gap-2">
-                <button onclick="toggleHabit(${h.id})" ${isDone ? 'disabled' : ''} class="p-2 pixel-border pixel-btn ${isDone ? 'bg-green-800 cursor-default' : 'bg-gray-700 hover:bg-gray-600'}">
-                  <i data-lucide="${isDone ? 'check' : 'plus'}" width="24" height="24"></i>
-                </button>
-                <button onclick="deleteHabit(${h.id})" class="p-2 text-gray-500 hover:text-red-500">
-                  <i data-lucide="trash-2" width="18" height="18"></i>
-                </button>
-              </div>
-            </div>`;
+          return `<div class="p-4 pixel-border flex items-center justify-between transition-all ${isDone ? 'bg-green-900/20 opacity-60 scale-95' : 'glass-panel'}"><div class="flex flex-col"><span class="text-xl font-bold ${isDone ? 'line-through text-gray-500' : 'text-white'}">${escapeHTML(h.text)}</span><span class="text-orange-400 text-sm flex items-center gap-1 font-bold"><i data-lucide="flame" width="14" height="14"></i> ${h.streak} DAY STREAK</span></div><div class="flex items-center gap-2"><button onclick="toggleHabit(${h.id})" ${isDone ? 'disabled' : ''} class="p-2 pixel-border pixel-btn ${isDone ? 'bg-green-800 cursor-default' : 'bg-gray-700 hover:bg-gray-600'}"><i data-lucide="${isDone ? 'check' : 'plus'}" width="24" height="24"></i></button><button onclick="deleteHabit(${h.id})" class="p-2 text-gray-500 hover:text-red-500"><i data-lucide="trash-2" width="18" height="18"></i></button></div></div>`;
         }).join('');
       }
 
-      // To-Do Render
       const todosList = document.getElementById('todos-list');
       if (state.todos.length === 0) {
         todosList.innerHTML = `<div class="glass-panel p-8 pixel-border text-center text-gray-500 italic">Empty mission log.</div>`;
       } else {
-        todosList.innerHTML = state.todos.map(t => `
-          <div class="p-4 pixel-border flex items-center justify-between transition-all ${t.completed ? 'bg-blue-900/20 opacity-60 scale-95' : 'glass-panel'}">
-            <div class="flex items-center gap-3">
-              <button onclick="toggleTodo(${t.id})" class="w-8 h-8 pixel-border flex items-center justify-center ${t.completed ? 'bg-blue-600' : 'bg-gray-700'}">
-                ${t.completed ? `<i data-lucide="check" width="18" height="18"></i>` : ''}
-              </button>
-              <div class="flex flex-col">
-                <span class="text-xl font-bold ${t.completed ? 'line-through text-gray-500' : 'text-white'} ${t.important ? 'text-yellow-400 underline decoration-yellow-600' : ''}">${escapeHTML(t.text)}</span>
-                ${t.important ? '<span class="text-[10px] text-yellow-600 uppercase font-bold">Priority Target</span>' : ''}
-              </div>
-            </div>
-            <button onclick="deleteTodo(${t.id})" class="p-2 text-gray-500 hover:text-red-500">
-              <i data-lucide="trash-2" width="18" height="18"></i>
-            </button>
-          </div>`).join('');
+        todosList.innerHTML = state.todos.map(t => `<div class="p-4 pixel-border flex items-center justify-between transition-all ${t.completed ? 'bg-blue-900/20 opacity-60 scale-95' : 'glass-panel'}"><div class="flex items-center gap-3"><button onclick="toggleTodo(${t.id})" class="w-8 h-8 pixel-border flex items-center justify-center ${t.completed ? 'bg-blue-600' : 'bg-gray-700'}">${t.completed ? `<i data-lucide="check" width="18" height="18"></i>` : ''}</button><div class="flex flex-col"><span class="text-xl font-bold ${t.completed ? 'line-through text-gray-500' : 'text-white'} ${t.important ? 'text-yellow-400 underline decoration-yellow-600' : ''}">${escapeHTML(t.text)}</span>${t.important ? '<span class="text-[10px] text-yellow-600 uppercase font-bold">Priority Target</span>' : ''}</div></div><button onclick="deleteTodo(${t.id})" class="p-2 text-gray-500 hover:text-red-500"><i data-lucide="trash-2" width="18" height="18"></i></button></div>`).join('');
       }
 
-      // Footer UI
       document.getElementById('footer-level').innerText = state.level;
       document.getElementById('footer-missions').innerText = `${state.habits.length + state.todos.length} Missions Tracked`;
-
       lucide.createIcons();
     }
 
-    // --- BOOTSTRAP ---
     window.onload = () => {
       loadState();
       checkDailyReset();
-      setInterval(checkDailyReset, 30000); // Poll for midnight reset
+      setInterval(checkDailyReset, 30000);
       render();
     };
   </script>
