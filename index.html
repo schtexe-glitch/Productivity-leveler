@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Check, Plus, Flame, Trash2, Star, Zap, Trophy, ListTodo, X, PlusCircle } from 'lucide-react';
+import { Check, Plus, Flame, Trash2, Star, Zap, Trophy, ListTodo, X } from 'lucide-react';
 
 // --- XP PROGRESSION DATA (0-50) ---
 const XP_TABLE = [
@@ -143,12 +143,16 @@ const App = () => {
 
   return (
     <div className="relative min-h-screen text-[#e0e0e0] font-mono selection:bg-purple-500 flex flex-col items-center p-4 overflow-x-hidden">
+      {/* PWA Tags added as requested */}
+      <link rel="manifest" href="/manifest.json" />
+      <meta name="theme-color" content="#0f172a" />
+      
       {/* BACKGROUND IMAGE WITH OVERLAY */}
       <div 
         className="fixed inset-0 z-[-1] bg-cover bg-center bg-no-repeat transition-all duration-700"
         style={{ backgroundImage: `url('https://i.pinimg.com/originals/ed/a5/73/eda5739966cb33768d8ad0d77d7307ce.gif')` }}
       >
-        <div className="absolute inset-0 bg-black/60" /> {/* Dark overlay for readability */}
+        <div className="absolute inset-0 bg-black/60" /> 
       </div>
 
       <style>{`
@@ -187,7 +191,6 @@ const App = () => {
             </button>
           </div>
           
-          {/* XP BAR */}
           <div className="w-full h-6 bg-[#333]/50 pixel-border relative overflow-hidden mb-2">
             <div 
               className="h-full bg-purple-500 transition-all duration-500 ease-out shadow-[0_0_15px_rgba(168,85,247,0.5)]" 
@@ -200,7 +203,6 @@ const App = () => {
           </div>
         </div>
 
-        {/* FEEDBACK OVERLAY */}
         {feedback.map(f => (
           <div 
             key={f.id} 
