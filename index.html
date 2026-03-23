@@ -9,6 +9,17 @@
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#0f172a">
 
+  <!-- Service Worker Registration -->
+  <script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("/sw.js")
+          .then(() => console.log("SW registered"))
+          .catch(err => console.log("SW error:", err));
+      });
+    }
+  </script>
+
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   
@@ -18,51 +29,102 @@
   <style>
     @import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
     body { font-family: 'VT323', monospace; letter-spacing: 0.05em; font-size: 1.25rem; }
-    .pixel-border { border: 4px solid #333; box-shadow: 4px 4px 0px #000; }
-    .pixel-btn:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0px #000; }
-    .glass-panel { background: rgba(30, 30, 30, 0.85); backdrop-filter: blur(4px); }
-    .floating-xp { animation: floatUp 1s ease-out forwards; }
+    
+    .pixel-border { 
+      border: 4px solid #333; 
+      box-shadow: 4px 4px 0px #000; 
+      transition: all 0.1s;
+    }
+    .pixel-btn:active { 
+      transform: translate(2px, 2px); 
+      box-shadow: 1px 1px 0px #000; 
+    }
+    .glass-panel { background: rgba(20, 20, 25, 0.9); backdrop-filter: blur(8px); }
+    
+    .floating-xp { 
+      animation: floatUp 0.8s ease-out forwards; 
+      text-shadow: 2px 2px 0px #000;
+    }
     @keyframes floatUp {
-      0% { transform: translateY(0); opacity: 1; }
-      100% { transform: translateY(-50px); opacity: 0; }
+      0% { transform: translateY(0) scale(0.5); opacity: 0; }
+      20% { opacity: 1; transform: translateY(-10px) scale(1.2); }
+      100% { transform: translateY(-60px) scale(1); opacity: 0; }
     }
-    .level-pulse { animation: pulse 0.5s infinite; }
+
+    .level-pulse { animation: pulse 1s infinite; }
     @keyframes pulse {
-      0%, 100% { text-shadow: 0 0 10px #a855f7; transform: scale(1); }
-      50% { text-shadow: 0 0 20px #a855f7; transform: scale(1.1); }
+      0%, 100% { text-shadow: 0 0 10px #a855f7, 0 0 20px #a855f7; transform: scale(1); color: #fff; }
+      50% { text-shadow: 0 0 30px #d8b4fe, 0 0 40px #a855f7; transform: scale(1.1); color: #e9d5ff; }
     }
-    /* Hide scrollbar for Chrome, Safari and Opera */
+
+    .xp-glow {
+      box-shadow: 0 0 15px rgba(168, 85, 247, 0.6);
+      position: relative;
+      overflow: hidden;
+    }
+    .xp-glow::after {
+      content: '';
+      position: absolute;
+      top: 0; left: -100%;
+      width: 50%; height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+      animation: shine 2s infinite;
+    }
+    @keyframes shine {
+      to { left: 200%; }
+    }
+
+    .confetti {
+      position: fixed;
+      width: 8px;
+      height: 8px;
+      pointer-events: none;
+      z-index: 100;
+      animation: fall linear forwards;
+    }
+    @keyframes fall {
+      to { transform: translateY(100vh) rotate(360deg); }
+    }
+
+    .mission-entry {
+      animation: slideIn 0.3s ease-out forwards;
+    }
+    @keyframes slideIn {
+      from { transform: translateX(-10px); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+
     .no-scrollbar::-webkit-scrollbar { display: none; }
-    /* Hide scrollbar for IE, Edge and Firefox */
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
   </style>
 </head>
-<body class="relative min-h-screen text-[#e0e0e0] font-mono selection:bg-purple-500 flex flex-col items-center p-4 overflow-x-hidden no-scrollbar">
+<body class="relative min-h-screen text-[#e0e0e0] font-mono selection:bg-purple-500 flex flex-col items-center p-4 overflow-x-hidden no-scrollbar bg-[#0a0a0c]">
 
   <!-- BACKGROUND IMAGE -->
-  <div class="fixed inset-0 z-[-1] bg-cover bg-center bg-no-repeat transition-all duration-700" style="background-image: url('https://i.pinimg.com/originals/ed/a5/73/eda5739966cb33768d8ad0d77d7307ce.gif')">
-    <div class="absolute inset-0 bg-black/60"></div> 
+  <div class="fixed inset-0 z-[-1] bg-cover bg-center bg-no-repeat transition-all duration-1000" style="background-image: url('https://i.pinimg.com/originals/ed/a5/73/eda5739966cb33768d8ad0d77d7307ce.gif')">
+    <div class="absolute inset-0 bg-black/70"></div> 
   </div>
 
   <!-- HEADER / STATS -->
-  <header class="w-full max-w-md mb-8 sticky top-0 pt-4 z-10">
-    <div class="glass-panel p-4 pixel-border mb-2">
+  <header class="w-full max-w-md mb-8 sticky top-0 pt-4 z-20">
+    <div class="glass-panel p-4 pixel-border mb-2 border-purple-900/50">
       <div class="flex justify-between items-start mb-4">
         <div class="flex flex-col">
-          <span class="text-gray-400 text-sm uppercase tracking-widest">Player Profile</span>
-          <h1 id="level-display" class="text-4xl font-bold text-white">LV. 0</h1>
+          <span class="text-purple-400 text-xs uppercase tracking-widest font-bold">Player Protocol v2.5</span>
+          <h1 id="level-display" class="text-5xl font-bold text-white tracking-tighter">LV. 0</h1>
         </div>
-        <button onclick="openAddMenu()" class="pixel-border bg-purple-600 p-2 pixel-btn hover:bg-purple-500 flex items-center gap-2">
-          <i data-lucide="plus" width="20" height="20"></i> <span class="hidden sm:inline font-bold uppercase">Mission</span>
+        <button onclick="playSound('click'); openAddMenu()" class="pixel-border bg-purple-600 p-2 pixel-btn hover:bg-purple-500 flex items-center gap-2 group">
+          <i data-lucide="plus" class="group-hover:rotate-90 transition-transform"></i> 
+          <span class="hidden sm:inline font-bold uppercase">Mission</span>
         </button>
       </div>
       
-      <div class="w-full h-6 bg-[#333]/50 pixel-border relative overflow-hidden mb-2">
-        <div id="xp-bar" class="h-full bg-purple-500 transition-all duration-500 ease-out shadow-[0_0_15px_rgba(168,85,247,0.5)]" style="width: 0%"></div>
+      <div class="w-full h-8 bg-black/60 pixel-border relative overflow-hidden mb-2 border-gray-800">
+        <div id="xp-bar" class="h-full bg-purple-500 transition-all duration-700 ease-out xp-glow" style="width: 0%"></div>
       </div>
-      <div class="flex justify-between items-center text-gray-300 text-sm">
-        <span id="base-xp-text">Base: 6 XP</span>
-        <span id="xp-text" class="font-bold">0 / 12 XP</span>
+      <div class="flex justify-between items-center text-gray-400 text-sm font-bold uppercase tracking-tighter">
+        <span id="base-xp-text" class="flex items-center gap-1"><i data-lucide="zap" width="12"></i> 6 XP</span>
+        <span id="xp-text" class="text-purple-300">0 / 12 XP</span>
       </div>
     </div>
 
@@ -71,41 +133,41 @@
   </header>
 
   <!-- ADD MENU MODAL -->
-  <div id="add-menu-modal" class="hidden fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-    <div class="bg-[#1e1e1e] pixel-border w-full max-w-sm p-6 relative">
-      <button onclick="closeAddMenu()" class="absolute top-4 right-4 text-gray-500 hover:text-white">
+  <div id="add-menu-modal" class="hidden fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4 backdrop-blur-md">
+    <div class="bg-[#1a1a1e] pixel-border border-purple-500 w-full max-w-sm p-6 relative">
+      <button onclick="playSound('click'); closeAddMenu()" class="absolute top-4 right-4 text-gray-500 hover:text-white">
         <i data-lucide="x" width="24" height="24"></i>
       </button>
       
-      <h2 class="text-2xl font-bold mb-6 border-b border-gray-800 pb-2 uppercase tracking-widest text-purple-400">New Mission</h2>
+      <h2 class="text-3xl font-bold mb-6 border-b-4 border-purple-900/50 pb-2 uppercase tracking-widest text-purple-400">Add Entry</h2>
       
       <div class="space-y-8">
         <!-- Add Habit -->
         <form onsubmit="handleAddHabit(event)" class="space-y-2">
           <label class="text-orange-400 flex items-center gap-2 text-sm uppercase font-bold">
-            <i data-lucide="zap" width="16" height="16"></i> Daily Habit
+            <i data-lucide="flame" width="16"></i> Daily Habit
           </label>
           <div class="flex gap-2">
-            <input id="habit-input" placeholder="E.g. Exercise" required class="flex-grow bg-[#121212] pixel-border p-2 focus:outline-none focus:border-orange-500 text-white" />
-            <button type="submit" class="bg-orange-600 p-2 pixel-border pixel-btn font-bold">ADD</button>
+            <input id="habit-input" placeholder="E.g. Meditation" required class="flex-grow bg-[#0c0c0e] pixel-border border-gray-700 p-2 focus:outline-none focus:border-orange-500 text-white" />
+            <button type="submit" class="bg-orange-600 p-2 pixel-border pixel-btn font-bold px-4">ADD</button>
           </div>
         </form>
 
         <!-- Add To-Do -->
         <form onsubmit="handleAddTodo(event)" class="space-y-2">
           <label class="text-blue-400 flex items-center gap-2 text-sm uppercase font-bold">
-            <i data-lucide="list-todo" width="16" height="16"></i> Task
+            <i data-lucide="target" width="16"></i> Critical Task
           </label>
           <div class="flex gap-2">
-            <input id="todo-input" placeholder="E.g. Call client" required class="flex-grow bg-[#121212] pixel-border p-2 focus:outline-none focus:border-blue-500 text-white" />
-            <button type="submit" class="bg-blue-600 p-2 pixel-border pixel-btn font-bold">ADD</button>
+            <input id="todo-input" placeholder="E.g. Finish report" required class="flex-grow bg-[#0c0c0e] pixel-border border-gray-700 p-2 focus:outline-none focus:border-blue-500 text-white" />
+            <button type="submit" class="bg-blue-600 p-2 pixel-border pixel-btn font-bold px-4">ADD</button>
           </div>
           <label class="flex items-center gap-2 cursor-pointer group text-sm text-gray-400 mt-2">
             <input type="checkbox" id="todo-important" class="hidden peer" />
-            <div class="w-5 h-5 pixel-border border-2 bg-gray-800 peer-checked:bg-yellow-500 flex items-center justify-center">
-              <i data-lucide="star" width="12" height="12" class="text-white"></i>
+            <div class="w-6 h-6 pixel-border border-2 bg-gray-900 peer-checked:bg-yellow-500 flex items-center justify-center transition-colors">
+              <i data-lucide="star" width="14" height="14" class="text-white"></i>
             </div>
-            High Priority (+50% XP)
+            Elite Target (+50% XP)
           </label>
         </form>
       </div>
@@ -116,9 +178,9 @@
   <main class="w-full max-w-md flex-grow mb-24 space-y-6">
     <!-- HABITS TAB -->
     <section id="habits-section" class="space-y-4">
-      <div class="flex justify-between items-center border-b-4 border-orange-600/50 pb-2">
-        <h2 class="text-2xl flex items-center gap-2 text-orange-400 font-bold drop-shadow-md uppercase">
-          <i data-lucide="zap" width="22" height="22"></i> Daily Habits
+      <div class="flex justify-between items-center border-b-4 border-orange-600/30 pb-2">
+        <h2 class="text-3xl flex items-center gap-2 text-orange-400 font-bold uppercase italic">
+          <i data-lucide="zap" class="fill-orange-400"></i> Daily Habits
         </h2>
       </div>
       <div id="habits-list" class="space-y-4"></div>
@@ -126,44 +188,117 @@
 
     <!-- TODOS TAB -->
     <section id="todos-section" class="space-y-4 hidden">
-      <div class="flex justify-between items-center border-b-4 border-blue-600/50 pb-2">
-        <h2 class="text-2xl flex items-center gap-2 text-blue-400 font-bold drop-shadow-md uppercase">
-          <i data-lucide="list-todo" width="22" height="22"></i> To-Do List
+      <div class="flex justify-between items-center border-b-4 border-blue-600/30 pb-2">
+        <h2 class="text-3xl flex items-center gap-2 text-blue-400 font-bold uppercase italic">
+          <i data-lucide="list-todo" class="fill-blue-400"></i> Quest Log
         </h2>
       </div>
-      <div class="glass-panel border-2 border-blue-600/50 p-2 text-[12px] text-center text-blue-300 uppercase tracking-widest mb-4 font-bold">
-        SYSTEM: CLEARING ALL TASKS AT MIDNIGHT
+
+      <!-- QUICK ADD TODO -->
+      <form onsubmit="handleQuickAddTodo(event)" class="flex gap-2 group">
+        <input id="quick-todo-input" placeholder="New quest name..." class="flex-grow bg-black/60 pixel-border border-blue-900/50 p-3 focus:outline-none focus:border-blue-400 text-white text-xl placeholder:text-gray-600" />
+        <button type="submit" class="bg-blue-600 p-3 pixel-border pixel-btn font-bold hover:bg-blue-500">
+          <i data-lucide="plus" width="24"></i>
+        </button>
+      </form>
+
+      <div class="bg-blue-900/20 border-x-4 border-blue-600/40 p-2 text-[11px] text-center text-blue-400 uppercase tracking-[0.2em] font-bold">
+        Warning: Auto-Reset engaged at 00:00
       </div>
       <div id="todos-list" class="space-y-4"></div>
     </section>
   </main>
 
   <!-- BOTTOM NAV -->
-  <nav class="fixed bottom-0 left-0 right-0 h-24 glass-panel border-t-4 border-[#333] flex items-center justify-around z-10 px-4">
-    <button onclick="setTab('habits')" id="nav-habits" class="flex flex-col items-center gap-1 transition-all flex-1 py-2 text-orange-400 scale-110">
-      <i data-lucide="zap" width="32" height="32"></i>
-      <span class="text-sm uppercase font-bold tracking-tighter">Habits</span>
+  <nav class="fixed bottom-0 left-0 right-0 h-24 glass-panel border-t-4 border-[#1e1e22] flex items-center justify-around z-30 px-4">
+    <button onclick="playSound('click'); setTab('habits')" id="nav-habits" class="flex flex-col items-center gap-1 transition-all flex-1 py-2 text-orange-400 scale-110">
+      <i data-lucide="zap" width="36" height="36"></i>
+      <span class="text-xs uppercase font-black tracking-widest">Habits</span>
     </button>
-    <button onclick="setTab('todo')" id="nav-todos" class="flex flex-col items-center gap-1 transition-all flex-1 py-2 text-gray-500">
-      <i data-lucide="list-todo" width="32" height="32"></i>
-      <span class="text-sm uppercase font-bold tracking-tighter">To-Do</span>
+    <div class="w-px h-12 bg-gray-800"></div>
+    <button onclick="playSound('click'); setTab('todo')" id="nav-todos" class="flex flex-col items-center gap-1 transition-all flex-1 py-2 text-gray-600">
+      <i data-lucide="list-todo" width="36" height="36"></i>
+      <span class="text-xs uppercase font-black tracking-widest">Quests</span>
     </button>
   </nav>
 
   <!-- QUICK STATS FOOTER -->
-  <footer class="w-full max-w-md text-center text-gray-400 text-[12px] pb-28 flex justify-between px-4 uppercase font-bold tracking-widest drop-shadow-md">
-    <span class="flex items-center gap-1"><i data-lucide="trophy" width="14" height="14"></i> LV <span id="footer-level">0</span></span>
-    <span id="footer-missions">0 MISSIONS LOGGED</span>
+  <footer class="w-full max-w-md text-center text-gray-500 text-[10px] pb-28 flex justify-between px-4 uppercase font-bold tracking-[0.3em] opacity-50">
+    <span class="flex items-center gap-1"><i data-lucide="award" width="12"></i> Rank: <span id="footer-level">0</span></span>
+    <span id="footer-missions">SCANNING LOGS...</span>
   </footer>
 
   <script>
-    // --- XP PROGRESSION DATA (0-50) ---
+    // --- SOUND ENGINE ---
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    
+    function playSound(type) {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+
+      const now = audioCtx.currentTime;
+
+      if (type === 'click') {
+        // Soft pop
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(220, now);
+        osc.frequency.exponentialRampToValueAtTime(110, now + 0.05);
+        gain.gain.setValueAtTime(0.05, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+        osc.start();
+        osc.stop(now + 0.05);
+      } else if (type === 'complete') {
+        // Soft chime
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(660, now);
+        osc.frequency.exponentialRampToValueAtTime(880, now + 0.1);
+        gain.gain.setValueAtTime(0.08, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+        osc.start();
+        osc.stop(now + 0.4);
+      } else if (type === 'levelup') {
+        // Melodic arpeggio
+        [440, 554.37, 659.25, 880].forEach((freq, i) => {
+           const o = audioCtx.createOscillator();
+           const g = audioCtx.createGain();
+           o.type = 'sine';
+           o.connect(g);
+           g.connect(audioCtx.destination);
+           o.frequency.setValueAtTime(freq, now + (i * 0.1));
+           g.gain.setValueAtTime(0, now + (i * 0.1));
+           g.gain.linearRampToValueAtTime(0.1, now + (i * 0.1) + 0.05);
+           g.gain.linearRampToValueAtTime(0, now + (i * 0.1) + 0.3);
+           o.start(now + (i * 0.1));
+           o.stop(now + (i * 0.1) + 0.3);
+        });
+      }
+    }
+
+    function createConfetti() {
+      const colors = ['#a855f7', '#d8b4fe', '#ffffff', '#fb923c'];
+      for(let i = 0; i < 30; i++) {
+        const el = document.createElement('div');
+        el.className = 'confetti pixel-border';
+        el.style.left = Math.random() * 100 + 'vw';
+        el.style.top = '-10px';
+        el.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+        el.style.width = (Math.random() * 10 + 5) + 'px';
+        el.style.height = el.style.width;
+        el.style.animationDuration = (Math.random() * 2 + 1) + 's';
+        document.body.appendChild(el);
+        setTimeout(() => el.remove(), 3000);
+      }
+    }
+
+    // --- GAME LOGIC ---
     const XP_TABLE = [
-      12, 15, 18, 22, 26, 30, 36, 44, 54, 66, 80, // 0-10
-      96, 114, 135, 160, 188, 220, 256, 296, 340, 390, // 11-20
-      445, 505, 570, 640, 715, 795, 880, 970, 1065, 1165, // 21-30
-      1270, 1380, 1495, 1615, 1740, 1870, 2005, 2145, 2290, 2440, // 31-40
-      2595, 2755, 2920, 3090, 3265, 3445, 3630, 3820, 4015, 4215 // 41-50
+      12, 15, 18, 22, 26, 30, 36, 44, 54, 66, 80, 
+      96, 114, 135, 160, 188, 220, 256, 296, 340, 390, 
+      445, 505, 570, 640, 715, 795, 880, 970, 1065, 1165, 
+      1270, 1380, 1495, 1615, 1740, 1870, 2005, 2145, 2290, 2440, 
+      2595, 2755, 2920, 3090, 3265, 3445, 3630, 3820, 4015, 4215 
     ];
 
     const getXpRequired = (level) => {
@@ -181,7 +316,6 @@
       return 25;
     };
 
-    // --- STATE MANAGEMENT ---
     let state = {
       level: 0,
       xp: 0,
@@ -191,7 +325,6 @@
       showLevelUp: false
     };
 
-    // Save/Load from LocalStorage
     function saveState() {
       localStorage.setItem('leveler_save_data', JSON.stringify(state));
     }
@@ -201,51 +334,45 @@
       if (saved) {
         state = { ...state, ...JSON.parse(saved) };
       } else {
-        // Default starting data
         state.habits = [
-          { id: 1, text: 'Drink 2L Water', streak: 0, lastCompleted: null },
-          { id: 2, text: 'Morning Exercise', streak: 0, lastCompleted: null }
+          { id: 1, text: 'Neural Meditation', streak: 0, lastCompleted: null },
+          { id: 2, text: 'Hydration Protocol', streak: 0, lastCompleted: null }
         ];
       }
     }
 
-    // Escape HTML
     const escapeHTML = (str) => str.replace(/[&<>'"]/g, tag => ({
       '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
     }[tag] || tag));
 
-    // --- DAILY RESET LOGIC ---
     function checkDailyReset() {
       const today = new Date().toDateString();
       const savedDate = localStorage.getItem('leveler_last_reset_date');
-
+      
       if (savedDate && savedDate !== today) {
-        // Clear To-Dos
         state.todos = [];
         saveState();
-        console.log("Midnight system check: Mission list cleared.");
         render();
+        console.log("System Refresh: New Day detected. Missions reset.");
       }
       localStorage.setItem('leveler_last_reset_date', today);
     }
 
-    // --- ACTIONS ---
     function addXp(amount) {
       state.xp += amount;
       let xpRequired = getXpRequired(state.level);
-
       while (state.xp >= xpRequired) {
         state.xp -= xpRequired;
         state.level += 1;
         state.showLevelUp = true;
+        playSound('levelup');
+        createConfetti();
         xpRequired = getXpRequired(state.level);
-        
         setTimeout(() => {
           state.showLevelUp = false;
           render();
         }, 3000);
       }
-      
       showFeedback(`+${amount} XP`);
       saveState();
       render();
@@ -254,12 +381,12 @@
     function showFeedback(text) {
       const container = document.getElementById('feedback-container');
       const el = document.createElement('div');
-      el.className = 'fixed floating-xp text-yellow-400 font-bold text-3xl z-50 pointer-events-none drop-shadow-md';
+      el.className = 'fixed floating-xp text-yellow-400 font-bold text-4xl z-50 pointer-events-none drop-shadow-lg';
       el.style.left = `${Math.random() * 40 + 30}%`;
-      el.style.top = '15%';
+      el.style.top = '25%';
       el.innerText = text;
       container.appendChild(el);
-      setTimeout(() => el.remove(), 1000);
+      setTimeout(() => el.remove(), 800);
     }
 
     function toggleHabit(id) {
@@ -267,6 +394,7 @@
       state.habits = state.habits.map(h => {
         if (h.id === id) {
           if (h.lastCompleted === today) return h;
+          playSound('complete');
           const base = getRewardBase(state.level);
           const streakBonus = Math.floor(h.streak / 5) * 2; 
           addXp(base + streakBonus);
@@ -278,6 +406,7 @@
     }
 
     function deleteHabit(id) {
+      playSound('click');
       state.habits = state.habits.filter(h => h.id !== id);
       saveState();
       render();
@@ -287,6 +416,7 @@
       state.todos = state.todos.map(t => {
         if (t.id === id) {
           if (!t.completed) {
+            playSound('complete');
             const base = getRewardBase(state.level);
             const reward = t.important ? Math.round(base * 1.5) : base;
             addXp(reward);
@@ -299,6 +429,7 @@
     }
 
     function deleteTodo(id) {
+      playSound('click');
       state.todos = state.todos.filter(t => t.id !== id);
       saveState();
       render();
@@ -306,6 +437,7 @@
 
     function handleAddHabit(e) {
       e.preventDefault();
+      playSound('click');
       const input = document.getElementById('habit-input');
       const val = input.value.trim();
       if (val) {
@@ -318,6 +450,7 @@
 
     function handleAddTodo(e) {
       e.preventDefault();
+      playSound('click');
       const input = document.getElementById('todo-input');
       const imp = document.getElementById('todo-important');
       const val = input.value.trim();
@@ -330,8 +463,22 @@
       }
     }
 
+    function handleQuickAddTodo(e) {
+      e.preventDefault();
+      playSound('click');
+      const input = document.getElementById('quick-todo-input');
+      const val = input.value.trim();
+      if (val) {
+        state.todos.push({ id: Date.now(), text: val, important: false, completed: false });
+        input.value = '';
+        saveState();
+        render();
+      }
+    }
+
     function openAddMenu() {
       document.getElementById('add-menu-modal').classList.remove('hidden');
+      setTimeout(() => document.getElementById('habit-input').focus(), 100);
     }
 
     function closeAddMenu() {
@@ -344,29 +491,23 @@
       render();
     }
 
-    // --- RENDER ENGINE ---
     function render() {
-      // Stats UI
       const levelEl = document.getElementById('level-display');
       levelEl.innerText = `LV. ${state.level}`;
       if (state.showLevelUp) {
-        levelEl.classList.add('level-pulse', 'text-purple-400');
-        document.getElementById('level-up-container').innerHTML = `
-          <div class="fixed top-1/3 left-1/2 -translate-x-1/2 text-6xl text-purple-400 font-bold level-pulse z-50 pointer-events-none drop-shadow-lg text-center">
-            LEVEL UP!
-          </div>`;
+        levelEl.classList.add('level-pulse');
+        document.getElementById('level-up-container').innerHTML = `<div class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-8xl text-purple-400 font-bold level-pulse z-50 pointer-events-none drop-shadow-2xl text-center whitespace-nowrap">LEVEL UP!</div>`;
       } else {
-        levelEl.classList.remove('level-pulse', 'text-purple-400');
+        levelEl.classList.remove('level-pulse');
         document.getElementById('level-up-container').innerHTML = '';
       }
 
       const xpReq = getXpRequired(state.level);
       const progress = (state.xp / xpReq) * 100;
       document.getElementById('xp-bar').style.width = `${progress}%`;
-      document.getElementById('base-xp-text').innerText = `Base Reward: ${getRewardBase(state.level)} XP`;
+      document.getElementById('base-xp-text').innerHTML = `<i data-lucide="zap" width="14"></i> ${getRewardBase(state.level)} XP`;
       document.getElementById('xp-text').innerText = `${state.xp} / ${xpReq} XP`;
 
-      // Tabs UI
       const habitsSec = document.getElementById('habits-section');
       const todosSec = document.getElementById('todos-section');
       const navHabits = document.getElementById('nav-habits');
@@ -375,89 +516,44 @@
       if (state.activeTab === 'habits') {
         habitsSec.classList.remove('hidden');
         todosSec.classList.add('hidden');
-        navHabits.className = 'flex flex-col items-center gap-1 transition-all flex-1 py-2 text-orange-400 scale-110 drop-shadow-[0_0_8px_rgba(251,146,60,0.5)]';
-        navTodos.className = 'flex flex-col items-center gap-1 transition-all flex-1 py-2 text-gray-500';
+        navHabits.className = 'flex flex-col items-center gap-1 transition-all flex-1 py-2 text-orange-400 scale-110 drop-shadow-[0_0_12px_rgba(251,146,60,0.6)] font-black';
+        navTodos.className = 'flex flex-col items-center gap-1 transition-all flex-1 py-2 text-gray-600';
       } else {
         habitsSec.classList.add('hidden');
         todosSec.classList.remove('hidden');
-        navHabits.className = 'flex flex-col items-center gap-1 transition-all flex-1 py-2 text-gray-500';
-        navTodos.className = 'flex flex-col items-center gap-1 transition-all flex-1 py-2 text-blue-400 scale-110 drop-shadow-[0_0_8px_rgba(96,165,250,0.5)]';
+        navHabits.className = 'flex flex-col items-center gap-1 transition-all flex-1 py-2 text-gray-600';
+        navTodos.className = 'flex flex-col items-center gap-1 transition-all flex-1 py-2 text-blue-400 scale-110 drop-shadow-[0_0_12px_rgba(96,165,250,0.6)] font-black';
       }
 
-      // Habits Render
       const habitsList = document.getElementById('habits-list');
       if (state.habits.length === 0) {
-        habitsList.innerHTML = `<div class="glass-panel p-8 pixel-border text-center text-gray-500 italic">No habits tracking.</div>`;
+        habitsList.innerHTML = `<div class="glass-panel p-8 pixel-border border-dashed border-gray-700 text-center text-gray-600 italic">SYSTEM IDLE: NO HABITS REGISTERED</div>`;
       } else {
         const today = new Date().toDateString();
         habitsList.innerHTML = state.habits.map(h => {
           const isDone = h.lastCompleted === today;
-          return `
-            <div class="p-4 pixel-border flex items-center justify-between transition-all ${isDone ? 'bg-green-900/20 opacity-60 scale-95' : 'glass-panel'}">
-              <div class="flex flex-col">
-                <span class="text-xl font-bold ${isDone ? 'line-through text-gray-500' : 'text-white'}">${escapeHTML(h.text)}</span>
-                <span class="text-orange-400 text-sm flex items-center gap-1 font-bold">
-                  <i data-lucide="flame" width="14" height="14"></i> ${h.streak} DAY STREAK
-                </span>
-              </div>
-              <div class="flex items-center gap-2">
-                <button onclick="toggleHabit(${h.id})" ${isDone ? 'disabled' : ''} class="p-2 pixel-border pixel-btn ${isDone ? 'bg-green-800 cursor-default' : 'bg-gray-700 hover:bg-gray-600'}">
-                  <i data-lucide="${isDone ? 'check' : 'plus'}" width="24" height="24"></i>
-                </button>
-                <button onclick="deleteHabit(${h.id})" class="p-2 text-gray-500 hover:text-red-500">
-                  <i data-lucide="trash-2" width="18" height="18"></i>
-                </button>
-              </div>
-            </div>`;
+          return `<div class="mission-entry p-4 pixel-border flex items-center justify-between transition-all ${isDone ? 'bg-green-900/20 opacity-40 grayscale' : 'glass-panel border-orange-900/20'}"><div class="flex flex-col"><span class="text-2xl font-bold ${isDone ? 'line-through text-gray-500' : 'text-white'}">${escapeHTML(h.text)}</span><span class="text-orange-400 text-sm flex items-center gap-1 font-bold uppercase tracking-tighter"><i data-lucide="flame" width="14"></i> ${h.streak} CYCLE STREAK</span></div><div class="flex items-center gap-2"><button onclick="toggleHabit(${h.id})" ${isDone ? 'disabled' : ''} class="p-2 pixel-border pixel-btn ${isDone ? 'bg-green-800 border-green-400 cursor-default' : 'bg-gray-800 hover:bg-orange-600 border-orange-900'}"><i data-lucide="${isDone ? 'check' : 'plus'}" width="28"></i></button><button onclick="deleteHabit(${h.id})" class="p-2 text-gray-700 hover:text-red-500 transition-colors"><i data-lucide="trash-2" width="18"></i></button></div></div>`;
         }).join('');
       }
 
-      // To-Do Render
       const todosList = document.getElementById('todos-list');
       if (state.todos.length === 0) {
-        todosList.innerHTML = `<div class="glass-panel p-8 pixel-border text-center text-gray-500 italic">Empty mission log.</div>`;
+        todosList.innerHTML = `<div class="glass-panel p-8 pixel-border border-dashed border-gray-700 text-center text-gray-600 italic">LOGS CLEAR: ALL OBJECTIVES SECURED</div>`;
       } else {
-        todosList.innerHTML = state.todos.map(t => `
-          <div class="p-4 pixel-border flex items-center justify-between transition-all ${t.completed ? 'bg-blue-900/20 opacity-60 scale-95' : 'glass-panel'}">
-            <div class="flex items-center gap-3">
-              <button onclick="toggleTodo(${t.id})" class="w-8 h-8 pixel-border flex items-center justify-center ${t.completed ? 'bg-blue-600' : 'bg-gray-700'}">
-                ${t.completed ? `<i data-lucide="check" width="18" height="18"></i>` : ''}
-              </button>
-              <div class="flex flex-col">
-                <span class="text-xl font-bold ${t.completed ? 'line-through text-gray-500' : 'text-white'} ${t.important ? 'text-yellow-400 underline decoration-yellow-600' : ''}">${escapeHTML(t.text)}</span>
-                ${t.important ? '<span class="text-[10px] text-yellow-600 uppercase font-bold">Priority Target</span>' : ''}
-              </div>
-            </div>
-            <button onclick="deleteTodo(${t.id})" class="p-2 text-gray-500 hover:text-red-500">
-              <i data-lucide="trash-2" width="18" height="18"></i>
-            </button>
-          </div>`).join('');
+        todosList.innerHTML = state.todos.map(t => `<div class="mission-entry p-4 pixel-border flex items-center justify-between transition-all ${t.completed ? 'bg-blue-900/20 opacity-40 grayscale' : 'glass-panel border-blue-900/20'}"><div class="flex items-center gap-4"><button onclick="toggleTodo(${t.id})" class="w-10 h-10 pixel-border border-blue-900 flex items-center justify-center transition-all ${t.completed ? 'bg-blue-600' : 'bg-black/40 hover:bg-blue-900/40'}">${t.completed ? `<i data-lucide="check" width="24" class="text-white"></i>` : ''}</button><div class="flex flex-col"><span class="text-2xl font-bold ${t.completed ? 'line-through text-gray-500' : 'text-white'} ${t.important ? 'text-yellow-400' : ''}">${escapeHTML(t.text)}</span>${t.important ? '<span class="text-[10px] text-yellow-600 uppercase font-black tracking-widest">High Priority Protocol</span>' : ''}</div></div><button onclick="deleteTodo(${t.id})" class="p-2 text-gray-700 hover:text-red-500 transition-colors"><i data-lucide="trash-2" width="18"></i></button></div>`).join('');
       }
 
-      // Footer UI
       document.getElementById('footer-level').innerText = state.level;
-      document.getElementById('footer-missions').innerText = `${state.habits.length + state.todos.length} Missions Tracked`;
-
+      document.getElementById('footer-missions').innerText = `${state.habits.length + state.todos.length} ENTRIES ACTIVE`;
       lucide.createIcons();
     }
 
-    // --- BOOTSTRAP ---
     window.onload = () => {
       loadState();
       checkDailyReset();
-      setInterval(checkDailyReset, 30000); // Poll for midnight reset
+      setInterval(checkDailyReset, 10000); 
       render();
     };
   </script>
-<script>
-  if ("serviceWorker" in navigator) {
-    window.addEventListener("load", () => {
-      navigator.serviceWorker.register("/sw.js")
-        .then(() => console.log("SW registered"))
-        .catch(err => console.log("SW error:", err));
-    });
-  }
-</script>
-
 </body>
 </html>
