@@ -2,12 +2,14 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Daily Journal</title>
 
-    <!-- PWA Tags -->
-    <link rel="manifest" href="/manifest.json">
+    <!-- PWA Meta Tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#0f172a">
+    <link rel="manifest" href="data:application/manifest+json,{%22name%22:%22Daily%20Journal%22,%22short_name%22:%22Journal%22,%22start_url%22:%22.%22,%22display%22:%22standalone%22,%22background_color%22:%22%230f172a%22,%22theme_color%22:%22%230f172a%22}">
 
     <!-- Service Worker Registration -->
     <script>
@@ -24,6 +26,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+    
     <style>
         :root {
             --bg-color: #f8f9fa;
@@ -56,6 +59,9 @@
             transition: background-color 0.4s ease, color 0.4s ease;
             -webkit-tap-highlight-color: transparent;
             overscroll-behavior-y: none;
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
         }
 
         .soft-card {
@@ -114,39 +120,72 @@
 
         @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
-        .progress-bar-bg { background-color: var(--input-bg); height: 10px; border-radius: 6px; overflow: hidden; position: relative; }
-        .progress-bar-fill { background-color: var(--success-color); height: 100%; transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1); }
-        .progress-bar-fill.accent { background-color: var(--accent-color); }
-
         .modal-overlay { backdrop-filter: blur(4px); background-color: rgba(0,0,0,0.2); transition: all 0.3s ease; }
         body.theme-dark .modal-overlay { background-color: rgba(0,0,0,0.6); }
 
         .strike-through { text-decoration: line-through; color: var(--muted-color); }
+
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background-color: var(--surface-color);
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-around;
+            padding: 0.75rem 0.5rem calc(0.75rem + env(safe-area-inset-bottom));
+            z-index: 40;
+        }
+
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            color: var(--muted-color);
+            font-size: 0.7rem;
+            font-weight: 700;
+            transition: color 0.2s ease;
+            flex: 1;
+        }
+
+        .nav-item.active { color: var(--accent-color); }
+
+        .stat-badge {
+            background: var(--input-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 1rem;
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
     </style>
 </head>
-<body class="theme-dark h-screen w-screen flex flex-col overflow-hidden text-base">
+<body class="theme-dark">
 
-    <!-- Header -->
     <header class="p-5 flex justify-between items-center shrink-0">
         <div class="flex items-center gap-3">
-            <button id="btn-nav" class="soft-btn p-2 text-[color:var(--text-color)]">
+            <button id="btn-nav" class="soft-btn p-2 text-[color:var(--text-color)]" aria-label="Menu">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
             </button>
             <h1 id="header-date" class="font-bold text-lg tracking-wide"></h1>
         </div>
-        <button id="btn-theme" class="soft-btn p-2 text-[color:var(--text-color)]">
+        <button id="btn-theme" class="soft-btn p-2 text-[color:var(--text-color)]" aria-label="Toggle Theme">
             <svg id="icon-sun" class="hidden" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
             <svg id="icon-moon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
         </button>
     </header>
 
-    <!-- Navigation Overlay -->
     <div id="nav-menu" class="fixed inset-0 modal-overlay z-50 flex-col hidden justify-end">
         <div class="bg-[color:var(--surface-color)] rounded-t-3xl p-6 pb-10 shadow-xl border-t border-[color:var(--border-color)] transition-transform duration-300 transform translate-y-full" id="nav-content">
             <div class="flex justify-between items-center mb-6">
                 <h2 class="text-xl font-bold">Navigation</h2>
                 <button id="btn-close-nav" class="p-2 bg-[color:var(--input-bg)] rounded-full text-[color:var(--muted-color)]">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
                 </button>
             </div>
             <div class="space-y-3">
@@ -154,95 +193,96 @@
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
                     Daily Log
                 </button>
-                <button onclick="switchView('overview')" class="w-full text-left p-4 rounded-xl soft-input flex items-center gap-3 font-semibold">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
-                    Monthly Insights
-                </button>
                 <button onclick="switchView('history')" class="w-full text-left p-4 rounded-xl soft-input flex items-center gap-3 font-semibold">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="10" x2="21" y2="10"></line></svg>
                     Archive
                 </button>
+                <button onclick="switchView('stats')" class="w-full text-left p-4 rounded-xl soft-input flex items-center gap-3 font-semibold">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+                    Stats & Trends
+                </button>
             </div>
-            
             <div class="mt-8 pt-6 border-t border-[color:var(--border-color)]">
+                <div class="text-[0.65rem] uppercase font-black tracking-widest opacity-30 text-center mb-4">Midnight reset active</div>
                 <button id="btn-debug-skip" class="w-full text-left p-4 rounded-xl bg-[color:var(--accent-color)] bg-opacity-10 text-[color:var(--accent-color)] flex items-center gap-3 font-bold border border-[color:var(--accent-color)] border-opacity-20">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 4 15 12 5 20 5 4"></polygon><line x1="19" y1="5" x2="19" y2="19"></line></svg>
-                    Debug: Skip Day
+                    Debug: Force Archive Now
                 </button>
             </div>
         </div>
     </div>
 
-    <!-- MAIN CONTENT AREA -->
-    <main class="flex-1 overflow-y-auto px-5 pb-24 relative">
-
-        <!-- TODAY VIEW -->
+    <main class="flex-1 overflow-y-auto px-5 pb-32 relative">
         <div id="view-today" class="page-container active h-full space-y-8 pt-2">
-            <section>
+            <!-- TASKS SECTION -->
+            <section id="section-tasks" class="space-y-4">
                 <div class="flex justify-between items-end mb-4 px-1">
                     <h2 class="text-lg font-bold">Tasks</h2>
                 </div>
-                <div id="task-list" class="space-y-3"></div>
-                <form id="form-task" class="flex gap-2 mt-4 relative">
-                    <input type="text" id="input-task" placeholder="New task..." class="soft-input py-3 px-4 flex-1 text-sm shadow-sm" autocomplete="off">
+                <!-- Top Task Bar -->
+                <form id="form-task" class="flex gap-2 mb-4 relative">
+                    <input type="text" id="input-task" placeholder="New task..." class="soft-input py-3 px-4 flex-1 text-sm shadow-sm" autocomplete="off" enterkeyhint="done">
                     <button type="submit" class="absolute right-2 top-1.5 bottom-1.5 bg-[color:var(--text-color)] text-[color:var(--bg-color)] rounded-lg px-3 flex items-center justify-center">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
                     </button>
                 </form>
+                <div id="task-list" class="space-y-3"></div>
             </section>
 
-            <section>
+            <!-- HABITS SECTION -->
+            <section id="section-habits" class="hidden space-y-4">
                 <div class="flex justify-between items-center mb-4 px-1">
                     <h2 class="text-lg font-bold">Habits</h2>
                     <button onclick="openHabitManager()" class="text-xs bg-[color:var(--input-bg)] border border-[color:var(--border-color)] px-3 py-1.5 rounded-full text-[color:var(--muted-color)] font-bold">Manage</button>
                 </div>
                 <div id="habit-list" class="space-y-3"></div>
             </section>
+
+            <!-- NOTES SECTION -->
+            <section id="section-notes" class="hidden space-y-4 h-full flex flex-col">
+                <div class="flex justify-between items-center mb-4 px-1 shrink-0">
+                    <h2 class="text-lg font-bold">Daily Notes</h2>
+                </div>
+                <textarea id="textarea-notes" placeholder="Write anything here..." class="soft-input p-4 flex-1 text-sm shadow-sm min-h-[300px] resize-none leading-relaxed" spellcheck="false"></textarea>
+                <div class="text-[0.65rem] uppercase font-bold tracking-widest opacity-30 text-center py-2">Archives at midnight</div>
+            </section>
         </div>
 
-        <!-- OVERVIEW VIEW (Detailed Daily Percentage) -->
-        <div id="view-overview" class="page-container h-full pt-2">
-            <div class="flex justify-between items-baseline mb-6">
-                <h2 class="text-xl font-bold">Monthly Overview</h2>
-                <span id="overview-month-name" class="text-xs font-bold uppercase tracking-widest text-[color:var(--muted-color)]">Month</span>
-            </div>
-            
-            <div id="stats-container" class="space-y-6">
-                <!-- Month Progress -->
-                <div class="soft-card p-4">
-                    <div class="flex justify-between text-xs font-bold mb-2">
-                        <span>Calendar Month Progress</span>
-                        <span id="month-progress-val">0%</span>
-                    </div>
-                    <div class="progress-bar-bg">
-                        <div id="month-progress-bar" class="progress-bar-fill accent"></div>
-                    </div>
-                </div>
-
-                <!-- Daily Completion Rates -->
-                <div class="soft-card p-5">
-                    <h3 class="font-bold text-sm mb-4 flex items-center gap-2">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                        Daily Completion Rates
-                    </h3>
-                    <div id="daily-perc-list" class="space-y-4">
-                        <!-- Daily progress rows injected here -->
-                    </div>
-                </div>
-
-                <div id="overview-empty" class="hidden text-center text-[color:var(--muted-color)] p-10 font-bold bg-[color:var(--surface-color)] rounded-2xl border border-dashed border-[color:var(--border-color)]">
-                    No logs found for this month yet.<br><span class="text-xs font-normal">Complete tasks to see your stats!</span>
-                </div>
-            </div>
-        </div>
-
-        <!-- HISTORY LIST -->
+        <!-- HISTORY VIEW -->
         <div id="view-history" class="page-container h-full pt-2">
             <h2 class="text-xl font-bold mb-6">Archives</h2>
             <div id="history-list" class="space-y-4"></div>
         </div>
 
-        <!-- HISTORY DETAIL -->
+        <!-- STATS VIEW -->
+        <div id="view-stats" class="page-container h-full pt-2">
+            <h2 class="text-xl font-bold mb-6">Performance</h2>
+            
+            <div class="grid grid-cols-2 gap-4 mb-6">
+                <div class="stat-badge">
+                    <span class="text-[0.6rem] uppercase font-black opacity-40 mb-1">Lifetime Habits</span>
+                    <span id="stat-total-habits" class="text-2xl font-black">0</span>
+                    <span class="text-[0.6rem] opacity-60">Completed</span>
+                </div>
+                <div class="stat-badge">
+                    <span class="text-[0.6rem] uppercase font-black opacity-40 mb-1">Current Streak</span>
+                    <span id="stat-streak" class="text-2xl font-black text-[color:var(--accent-color)]">0</span>
+                    <span class="text-[0.6rem] opacity-60">Days</span>
+                </div>
+            </div>
+
+            <div class="soft-card p-6 mb-6">
+                <h3 class="text-xs font-bold uppercase opacity-40 mb-4 tracking-widest">Personal Best Day</h3>
+                <div id="stat-best-day-card" class="flex flex-col gap-2">
+                    <div id="stat-best-date" class="text-lg font-bold">No data yet</div>
+                    <div id="stat-best-details" class="text-sm opacity-60">Archive a day to see your peak.</div>
+                </div>
+            </div>
+            
+            <p class="text-[0.65rem] opacity-40 text-center uppercase font-black tracking-[0.2em] mt-10">Persistence is key</p>
+        </div>
+
+        <!-- DETAIL VIEW -->
         <div id="view-history-detail" class="page-container h-full pt-2">
             <div class="flex items-center gap-4 mb-6">
                 <button onclick="switchView('history')" class="soft-btn p-2 rounded-full"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg></button>
@@ -261,11 +301,29 @@
                     <h3 class="text-xs font-bold uppercase text-[color:var(--muted-color)] mb-2">Habits</h3>
                     <ul id="hist-habits-list" class="space-y-2 text-sm"></ul>
                 </div>
+                <div id="hist-notes-section">
+                    <h3 class="text-xs font-bold uppercase text-[color:var(--accent-color)] mb-2">Notes</h3>
+                    <div id="hist-notes-content" class="text-sm italic leading-relaxed whitespace-pre-wrap opacity-80 border-l-2 border-[color:var(--border-color)] pl-4"></div>
+                </div>
             </div>
         </div>
     </main>
 
-    <!-- Habit Manager Modal -->
+    <nav id="bottom-tabs" class="bottom-nav">
+        <button onclick="switchTab('tasks')" class="nav-item active" id="tab-tasks">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+            <span>TASKS</span>
+        </button>
+        <button onclick="switchTab('habits')" class="nav-item" id="tab-habits">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path></svg>
+            <span>HABITS</span>
+        </button>
+        <button onclick="switchTab('notes')" class="nav-item" id="tab-notes">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+            <span>NOTES</span>
+        </button>
+    </nav>
+
     <div id="modal-manage-habits" class="fixed inset-0 modal-overlay z-50 flex flex-col justify-end hidden">
         <div class="bg-[color:var(--surface-color)] rounded-t-3xl p-6 pb-12 shadow-2xl border-t border-[color:var(--border-color)] h-[60vh] flex flex-col transition-transform duration-300 transform translate-y-full" id="habit-content">
             <div class="flex justify-between items-center mb-6">
@@ -273,7 +331,7 @@
                 <button onclick="closeHabitManager()" class="p-2 bg-[color:var(--input-bg)] rounded-full text-[color:var(--muted-color)]"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
             </div>
             <form id="form-manage-habit" class="flex gap-2 mb-6 relative">
-                <input type="text" id="input-manage-habit" placeholder="New habit..." class="soft-input py-3 px-4 flex-1 text-sm shadow-sm" autocomplete="off">
+                <input type="text" id="input-manage-habit" placeholder="New habit..." class="soft-input py-3 px-4 flex-1 text-sm shadow-sm" autocomplete="off" enterkeyhint="done">
                 <button type="submit" class="bg-[color:var(--success-color)] text-white rounded-lg px-4 font-bold">Add</button>
             </form>
             <div id="manage-habit-list" class="flex-1 overflow-y-auto space-y-2"></div>
@@ -281,8 +339,32 @@
     </div>
 
     <script>
-        const STORAGE_KEY = 'soft_journal_v4';
-        let state = { theme: 'dark', lastOpenedDate: '', tasks: [], habits: [], habitStatus: {}, history: {} };
+        const STORAGE_KEY = 'soft_journal_v8_stable';
+        let state = { theme: 'dark', lastOpenedDate: '', tasks: [], habits: [], habitStatus: {}, notes: '', history: {} };
+        let currentTab = 'tasks';
+
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        function playSoftSound(type = 'click') {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            const now = audioCtx.currentTime;
+            if (type === 'pop') {
+                osc.type = 'sine'; osc.frequency.setValueAtTime(400, now); osc.frequency.exponentialRampToValueAtTime(150, now + 0.15);
+                gain.gain.setValueAtTime(0.15, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+                osc.start(now); osc.stop(now + 0.15);
+            } else if (type === 'tick') {
+                osc.type = 'sine'; osc.frequency.setValueAtTime(800, now); osc.frequency.exponentialRampToValueAtTime(1200, now + 0.05);
+                gain.gain.setValueAtTime(0.05, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
+                osc.start(now); osc.stop(now + 0.05);
+            } else {
+                osc.type = 'sine'; osc.frequency.setValueAtTime(150, now); gain.gain.setValueAtTime(0.1, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+                osc.start(now); osc.stop(now + 0.1);
+            }
+        }
 
         function init() {
             loadState();
@@ -291,6 +373,9 @@
             setupEvents();
             updateHeaderDate();
             renderToday();
+            switchTab('tasks');
+            document.getElementById('textarea-notes').value = state.notes || '';
+            setInterval(checkAndResetDay, 60000);
         }
 
         function loadState() {
@@ -318,6 +403,9 @@
                 archiveDay();
                 state.lastOpenedDate = todayStr;
                 saveState();
+                updateHeaderDate();
+                renderToday();
+                document.getElementById('textarea-notes').value = '';
             }
         }
 
@@ -325,18 +413,29 @@
             const entry = {
                 completedTasks: state.tasks.filter(t => t.completed),
                 missedTasks: state.tasks.filter(t => !t.completed),
-                habits: state.habits.map(h => ({ id: h.id, text: h.text, completed: state.habitStatus[h.id] || false }))
+                habits: state.habits.map(h => ({ 
+                    id: h.id, 
+                    text: h.text, 
+                    completed: state.habitStatus[h.id] || false 
+                })),
+                notes: state.notes || ''
             };
-            if (entry.completedTasks.length > 0 || entry.missedTasks.length > 0 || entry.habits.length > 0) {
+            const hasContent = entry.completedTasks.length > 0 || 
+                             entry.missedTasks.length > 0 || 
+                             entry.habits.length > 0 || 
+                             entry.notes.trim().length > 0;
+
+            if (hasContent) {
                 state.history[state.lastOpenedDate] = entry;
             }
             state.tasks = []; 
             state.habitStatus = {}; 
+            state.notes = ''; 
         }
 
         function renderToday() {
             const tList = document.getElementById('task-list');
-            tList.innerHTML = state.tasks.length ? '' : '<div class="text-center py-8 opacity-40 text-sm italic">Clean slate!</div>';
+            tList.innerHTML = state.tasks.length ? '' : '<div class="text-center py-8 opacity-40 text-sm italic">New day, new goals.</div>';
             state.tasks.forEach(t => {
                 const div = document.createElement('div');
                 div.className = 'soft-card p-4 flex items-center gap-4 animate-slide-up';
@@ -345,13 +444,21 @@
                     <span class="flex-1 font-semibold ${t.completed ? 'strike-through opacity-50' : ''}">${t.text}</span>
                     <button class="opacity-30 hover:opacity-100"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>
                 `;
-                div.querySelector('input').onclick = () => { t.completed = !t.completed; saveState(); renderToday(); };
-                div.querySelector('button').onclick = () => { state.tasks = state.tasks.filter(x => x.id !== t.id); saveState(); renderToday(); };
+                div.querySelector('input').onclick = () => { 
+                    t.completed = !t.completed; 
+                    if(t.completed) playSoftSound('pop'); else playSoftSound('tick');
+                    saveState(); renderToday(); 
+                };
+                div.querySelector('button').onclick = () => { 
+                    playSoftSound('tick');
+                    state.tasks = state.tasks.filter(x => x.id !== t.id); 
+                    saveState(); renderToday(); 
+                };
                 tList.appendChild(div);
             });
 
             const hList = document.getElementById('habit-list');
-            hList.innerHTML = '';
+            hList.innerHTML = state.habits.length ? '' : '<div class="text-center py-8 opacity-40 text-sm italic">Add habits to track.</div>';
             state.habits.forEach(h => {
                 const checked = state.habitStatus[h.id];
                 const div = document.createElement('div');
@@ -360,93 +467,113 @@
                     <input type="checkbox" class="soft-checkbox habit-check" ${checked ? 'checked' : ''}>
                     <span class="flex-1 font-semibold ${checked ? 'text-[color:var(--success-color)]' : ''}">${h.text}</span>
                 `;
-                div.querySelector('input').onclick = () => { state.habitStatus[h.id] = !checked; saveState(); renderToday(); };
+                div.querySelector('input').onclick = () => { 
+                    state.habitStatus[h.id] = !checked; 
+                    if(!checked) playSoftSound('pop'); else playSoftSound('tick');
+                    saveState(); renderToday(); 
+                };
                 hList.appendChild(div);
             });
         }
 
-        function renderOverview() {
-            const now = new Date();
-            const year = now.getFullYear();
-            const month = now.getMonth();
-            const currentMonthStr = `${year}-${String(month + 1).padStart(2, '0')}`;
+        function calculateStats() {
+            let totalHabitsDone = 0;
+            let bestDay = null;
+            let maxCompleted = -1;
             
-            document.getElementById('overview-month-name').textContent = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-
-            const daysInMonth = new Date(year, month + 1, 0).getDate();
-            const currentDay = now.getDate();
-            const monthPerc = Math.round((currentDay / daysInMonth) * 100);
-            document.getElementById('month-progress-val').textContent = monthPerc + '%';
-            document.getElementById('month-progress-bar').style.width = monthPerc + '%';
-
-            const monthEntries = Object.entries(state.history)
-                .filter(([date]) => date.startsWith(currentMonthStr))
-                .sort((a,b) => new Date(b[0]) - new Date(a[0]));
+            const dates = Object.keys(state.history).sort((a,b) => new Date(a) - new Date(b));
             
-            const list = document.getElementById('daily-perc-list');
-            list.innerHTML = '';
+            dates.forEach(date => {
+                const entry = state.history[date];
+                const habitsDone = entry.habits.filter(h => h.completed).length;
+                totalHabitsDone += habitsDone;
 
-            if (monthEntries.length === 0) {
-                document.getElementById('overview-empty').classList.remove('hidden');
-                return;
-            }
-            document.getElementById('overview-empty').classList.add('hidden');
-
-            monthEntries.forEach(([date, data]) => {
-                const completed = data.completedTasks?.length || 0;
-                const missed = data.missedTasks?.length || 0;
-                const total = completed + missed;
-                const perc = total === 0 ? 0 : Math.round((completed / total) * 100);
-                
-                const dateObj = new Date(date + 'T00:00:00');
-                const label = dateObj.toLocaleDateString('en-US', { day: 'numeric', weekday: 'short' });
-
-                const item = document.createElement('div');
-                item.className = 'space-y-1';
-                item.innerHTML = `
-                    <div class="flex justify-between items-baseline text-xs font-bold">
-                        <span class="opacity-60">${label}</span>
-                        <div class="flex items-center gap-2">
-                            <span class="${perc === 100 ? 'text-[color:var(--success-color)]' : ''}">${perc}%</span>
-                            <span class="text-[9px] opacity-40 font-normal">(${completed}/${total} tasks)</span>
-                        </div>
-                    </div>
-                    <div class="progress-bar-bg h-2">
-                        <div class="progress-bar-fill" style="width: ${perc}%"></div>
-                    </div>
-                `;
-                list.appendChild(item);
+                const completedCount = entry.completedTasks.length + habitsDone;
+                if (completedCount >= maxCompleted) {
+                    maxCompleted = completedCount;
+                    bestDay = { date, count: completedCount, habits: habitsDone, tasks: entry.completedTasks.length };
+                }
             });
+
+            // Calculate Streak
+            let streak = 0;
+            const todayStr = getLocalDateString();
+            let checkDate = new Date();
+            
+            while (true) {
+                const dateStr = `${checkDate.getFullYear()}-${String(checkDate.getMonth() + 1).padStart(2, '0')}-${String(checkDate.getDate()).padStart(2, '0')}`;
+                // Check history or if today has activity
+                const hasActivityToday = dateStr === todayStr && (state.tasks.some(t => t.completed) || Object.values(state.habitStatus).some(v => v));
+                
+                if (state.history[dateStr] || hasActivityToday) {
+                    streak++;
+                    checkDate.setDate(checkDate.getDate() - 1);
+                } else {
+                    break;
+                }
+            }
+
+            // Update UI
+            document.getElementById('stat-total-habits').textContent = totalHabitsDone;
+            document.getElementById('stat-streak').textContent = streak;
+            
+            if (bestDay) {
+                document.getElementById('stat-best-date').textContent = formatDateStr(bestDay.date);
+                document.getElementById('stat-best-details').textContent = `${bestDay.tasks} tasks & ${bestDay.habits} habits completed.`;
+            }
         }
 
         function switchView(viewId) {
+            playSoftSound('click');
             document.querySelectorAll('.page-container').forEach(el => el.classList.remove('active'));
             const header = document.getElementById('header-date');
+            const bottomNav = document.getElementById('bottom-tabs');
             
             if (viewId === 'today') {
                 header.textContent = formatDateStr(state.lastOpenedDate);
                 document.getElementById('view-today').classList.add('active');
-            } else if (viewId === 'overview') {
-                header.textContent = 'Insights';
-                renderOverview();
-                document.getElementById('view-overview').classList.add('active');
+                bottomNav.classList.remove('hidden');
             } else if (viewId === 'history') {
                 header.textContent = 'Archives';
                 renderHistoryList();
                 document.getElementById('view-history').classList.add('active');
+                bottomNav.classList.add('hidden');
+            } else if (viewId === 'stats') {
+                header.textContent = 'Stats';
+                calculateStats();
+                document.getElementById('view-stats').classList.add('active');
+                bottomNav.classList.add('hidden');
+            } else if (viewId === 'history-detail') {
+                document.getElementById('view-history-detail').classList.add('active');
+                bottomNav.classList.add('hidden');
             }
             closeNav();
+        }
+
+        function switchTab(tabId) {
+            playSoftSound('tick');
+            currentTab = tabId;
+            document.getElementById('section-tasks').classList.toggle('hidden', tabId !== 'tasks');
+            document.getElementById('section-habits').classList.toggle('hidden', tabId !== 'habits');
+            document.getElementById('section-notes').classList.toggle('hidden', tabId !== 'notes');
+            document.getElementById('tab-tasks').classList.toggle('active', tabId === 'tasks');
+            document.getElementById('tab-habits').classList.toggle('active', tabId === 'habits');
+            document.getElementById('tab-notes').classList.toggle('active', tabId === 'notes');
         }
 
         function renderHistoryList() {
             const list = document.getElementById('history-list');
             list.innerHTML = '';
             const dates = Object.keys(state.history).sort((a,b) => new Date(b) - new Date(a));
+            if (!dates.length) {
+                list.innerHTML = '<div class="text-center py-20 opacity-30 text-sm">No archives yet. Come back tomorrow!</div>';
+                return;
+            }
             dates.forEach(d => {
                 const div = document.createElement('button');
                 div.className = 'w-full soft-card p-4 text-left flex justify-between items-center';
                 div.innerHTML = `<span>${formatDateStr(d)}</span> <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>`;
-                div.onclick = () => renderHistoryDetail(d);
+                div.onclick = () => { playSoftSound('click'); renderHistoryDetail(d); };
                 list.appendChild(div);
             });
         }
@@ -457,22 +584,26 @@
             const mList = document.getElementById('hist-missed-list');
             mList.innerHTML = data.missedTasks.length ? '' : 'None! 🎉';
             data.missedTasks.forEach(t => mList.innerHTML += `<li>• ${t.text}</li>`);
-            
             const cList = document.getElementById('hist-completed-list');
             cList.innerHTML = '';
             data.completedTasks.forEach(t => cList.innerHTML += `<li>• ${t.text}</li>`);
-
             const hList = document.getElementById('hist-habits-list');
             hList.innerHTML = '';
             data.habits.forEach(h => hList.innerHTML += `<li class="${h.completed ? 'text-[color:var(--success-color)] font-bold' : 'opacity-40'}">${h.completed ? '✓' : '○'} ${h.text}</li>`);
-            
-            document.querySelectorAll('.page-container').forEach(el => el.classList.remove('active'));
-            document.getElementById('view-history-detail').classList.add('active');
+            const nContent = document.getElementById('hist-notes-content');
+            const nSection = document.getElementById('hist-notes-section');
+            if (data.notes && data.notes.trim()) {
+                nSection.classList.remove('hidden'); nContent.textContent = data.notes;
+            } else {
+                nSection.classList.add('hidden');
+            }
+            switchView('history-detail');
         }
 
         function formatDateStr(s) {
             if (!s) return '';
-            const d = new Date(s + 'T00:00:00');
+            const parts = s.split('-');
+            const d = new Date(parts[0], parts[1]-1, parts[2]);
             return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
         }
 
@@ -480,28 +611,52 @@
             document.getElementById('form-task').onsubmit = (e) => {
                 e.preventDefault();
                 const val = document.getElementById('input-task').value.trim();
-                if (val) { state.tasks.push({ id: Date.now(), text: val, completed: false }); saveState(); renderToday(); }
+                if (val) { 
+                    playSoftSound('pop');
+                    state.tasks.push({ id: Date.now(), text: val, completed: false }); 
+                    saveState(); renderToday(); 
+                }
                 document.getElementById('input-task').value = '';
             };
             document.getElementById('form-manage-habit').onsubmit = (e) => {
                 e.preventDefault();
                 const val = document.getElementById('input-manage-habit').value.trim();
-                if (val) { state.habits.push({ id: Date.now(), text: val }); saveState(); renderHabitManager(); renderToday(); }
+                if (val) { 
+                    playSoftSound('pop');
+                    state.habits.push({ id: Date.now(), text: val }); 
+                    saveState(); renderHabitManager(); renderToday(); 
+                }
                 document.getElementById('input-manage-habit').value = '';
             };
+            document.getElementById('textarea-notes').oninput = (e) => {
+                state.notes = e.target.value;
+                saveState();
+            };
             document.getElementById('btn-nav').onclick = () => {
+                playSoftSound('click');
                 const nav = document.getElementById('nav-menu');
                 nav.classList.remove('hidden'); nav.classList.add('flex');
                 setTimeout(() => document.getElementById('nav-content').classList.remove('translate-y-full'), 10);
             };
-            document.getElementById('btn-close-nav').onclick = closeNav;
-            document.getElementById('btn-theme').onclick = () => { state.theme = state.theme === 'dark' ? 'light' : 'dark'; applyTheme(); saveState(); };
+            document.getElementById('btn-close-nav').onclick = () => { playSoftSound('tick'); closeNav(); };
+            document.getElementById('btn-theme').onclick = () => { 
+                playSoftSound('tick');
+                state.theme = state.theme === 'dark' ? 'light' : 'dark'; 
+                applyTheme(); saveState(); 
+            };
             document.getElementById('btn-debug-skip').onclick = () => {
+                playSoftSound('pop');
                 archiveDay();
-                const d = new Date(state.lastOpenedDate + 'T00:00:00');
+                const parts = state.lastOpenedDate.split('-');
+                const d = new Date(parts[0], parts[1]-1, parts[2]);
                 d.setDate(d.getDate() + 1);
                 state.lastOpenedDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-                saveState(); switchView('today');
+                saveState(); 
+                updateHeaderDate();
+                renderToday();
+                document.getElementById('textarea-notes').value = '';
+                closeNav();
+                switchView('today');
             };
         }
 
@@ -511,12 +666,13 @@
         }
 
         function openHabitManager() {
-            renderHabitManager();
+            playSoftSound('click'); renderHabitManager();
             document.getElementById('modal-manage-habits').classList.remove('hidden');
             setTimeout(() => document.getElementById('habit-content').classList.remove('translate-y-full'), 10);
         }
 
         function closeHabitManager() {
+            playSoftSound('tick');
             document.getElementById('habit-content').classList.add('translate-y-full');
             setTimeout(() => document.getElementById('modal-manage-habits').classList.add('hidden'), 300);
         }
@@ -528,7 +684,11 @@
                 const div = document.createElement('div');
                 div.className = 'soft-input p-3 flex justify-between items-center font-bold';
                 div.innerHTML = `<span>${h.text}</span> <button class="text-[color:var(--accent-color)]">Del</button>`;
-                div.querySelector('button').onclick = () => { state.habits = state.habits.filter(x => x.id !== h.id); saveState(); renderHabitManager(); renderToday(); };
+                div.querySelector('button').onclick = () => { 
+                    playSoftSound('tick');
+                    state.habits = state.habits.filter(x => x.id !== h.id); 
+                    saveState(); renderHabitManager(); renderToday(); 
+                };
                 list.appendChild(div);
             });
         }
