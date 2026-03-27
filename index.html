@@ -9,8 +9,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#0f172a">
-    <link rel="manifest" href="data:application/manifest+json,{%22name%22:%22Daily%20Journal%22,%22short_name%22:%22Journal%22,%22start_url%22:%22.%22,%22display%22:%22standalone%22,%22background_color%22:%22%230f172a%22,%22theme_color%22:%22%230f172a%22}">
-
+    
     <!-- Service Worker Registration -->
     <script>
         if ("serviceWorker" in navigator) {
@@ -21,52 +20,58 @@
             });
         }
     </script>
-
+    
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     
     <style>
         :root {
-            --bg-color: #f8f9fa;
+            --bg-color: #fcfcfc;
             --surface-color: #ffffff;
-            --text-color: #495057;
-            --border-color: #e9ecef;
-            --shadow-color: rgba(149, 157, 165, 0.15);
-            --accent-color: #ff8fa3; 
-            --success-color: #6edb8f; 
-            --muted-color: #adb5bd;
-            --input-bg: #f8f9fa;
+            --text-color: #1a1a1a;
+            --border-color: #eeeeee;
+            --shadow-color: rgba(0, 0, 0, 0.05);
+            --accent-color: #c8ff57; 
+            --success-color: #c8ff57; 
+            --muted-color: #888888;
+            --input-bg: #f5f5f5;
+            --heading-font: 'DM Serif Display', serif;
+            --body-font: 'Inter', sans-serif;
         }
 
         body.theme-dark {
-            --bg-color: #121212;
-            --surface-color: #1e1e1e;
-            --text-color: #e0e0e0;
-            --border-color: #2c2c2c;
-            --shadow-color: rgba(0, 0, 0, 0.3);
-            --accent-color: #ff6b6b;
-            --success-color: #51cf66;
-            --muted-color: #6c757d;
-            --input-bg: #2b2b2b;
+            --bg-color: #0a0a0a;
+            --surface-color: #141414;
+            --text-color: #efefef;
+            --border-color: #222222;
+            --shadow-color: rgba(0, 0, 0, 0.4);
+            --accent-color: #c8ff57;
+            --success-color: #c8ff57;
+            --muted-color: #666666;
+            --input-bg: #1a1a1a;
         }
 
         body {
-            font-family: 'Nunito', sans-serif;
+            font-family: var(--body-font);
             background-color: var(--bg-color);
             color: var(--text-color);
             transition: background-color 0.4s ease, color 0.4s ease;
             -webkit-tap-highlight-color: transparent;
-            overscroll-behavior-y: none;
-            height: 100vh;
+            min-height: 100vh;
             width: 100vw;
-            overflow: hidden;
+            overflow-y: auto;
+            overflow-x: hidden;
+        }
+
+        h1, h2, h3, .editorial-font {
+            font-family: var(--heading-font);
         }
 
         .soft-card {
             background-color: var(--surface-color);
-            border-radius: 1rem;
+            border-radius: 0.5rem;
             box-shadow: 0 4px 12px var(--shadow-color);
             border: 1px solid var(--border-color);
         }
@@ -76,54 +81,52 @@
             border: 1px solid var(--border-color);
             color: var(--text-color);
             outline: none;
-            border-radius: 0.75rem;
+            border-radius: 0.4rem;
             transition: all 0.2s ease;
         }
 
         .soft-btn {
             background-color: var(--surface-color);
             border: 1px solid var(--border-color);
-            border-radius: 0.75rem;
-            box-shadow: 0 2px 6px var(--shadow-color);
+            border-radius: 0.4rem;
             transition: all 0.2s ease;
             display: flex;
             align-items: center;
             justify-content: center;
         }
         
-        .soft-btn:active { transform: translateY(2px); }
+        .soft-btn:active { transform: scale(0.96); }
 
         .soft-checkbox {
             appearance: none;
-            width: 22px;
-            height: 22px;
-            border: 2px solid var(--muted-color);
-            border-radius: 6px;
+            width: 20px;
+            height: 20px;
+            border: 1.5px solid var(--border-color);
+            border-radius: 4px;
             display: inline-flex;
             align-items: center;
             justify-content: center;
             cursor: pointer;
-            background: var(--surface-color);
+            background: var(--input-bg);
             flex-shrink: 0;
             transition: all 0.2s ease;
         }
         
         .soft-checkbox.habit-check { border-radius: 50%; }
-        .soft-checkbox:checked { background-color: var(--success-color); border-color: var(--success-color); }
+        .soft-checkbox:checked { background-color: var(--accent-color); border-color: var(--accent-color); }
         .soft-checkbox:checked::after {
-            content: ''; width: 5px; height: 10px; border: solid white;
-            border-width: 0 2px 2px 0; transform: rotate(45deg); margin-bottom: 2px;
+            content: ''; width: 5px; height: 9px; border: solid #000;
+            border-width: 0 2.5px 2.5px 0; transform: rotate(45deg); margin-bottom: 2px;
         }
 
-        .page-container { display: none; animation: slideUp 0.4s ease forwards; }
+        .page-container { display: none; animation: fadeIn 0.4s ease forwards; }
         .page-container.active { display: flex; flex-direction: column; }
 
-        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-        .modal-overlay { backdrop-filter: blur(4px); background-color: rgba(0,0,0,0.2); transition: all 0.3s ease; }
-        body.theme-dark .modal-overlay { background-color: rgba(0,0,0,0.6); }
+        .modal-overlay { backdrop-filter: blur(8px); background-color: rgba(0,0,0,0.4); transition: all 0.3s ease; }
 
-        .strike-through { text-decoration: line-through; color: var(--muted-color); }
+        .strike-through { text-decoration: line-through; color: var(--muted-color); font-style: italic; }
 
         .bottom-nav {
             position: fixed;
@@ -144,202 +147,245 @@
             align-items: center;
             gap: 4px;
             color: var(--muted-color);
-            font-size: 0.7rem;
+            font-size: 0.6rem;
             font-weight: 700;
+            letter-spacing: 0.05em;
             transition: color 0.2s ease;
             flex: 1;
         }
 
-        .nav-item.active { color: var(--accent-color); }
+        .nav-item.active { color: var(--text-color); }
+        .nav-item.active svg { color: var(--accent-color); }
 
         .stat-badge {
-            background: var(--input-bg);
+            background: var(--surface-color);
             border: 1px solid var(--border-color);
-            border-radius: 1rem;
+            border-radius: 0.5rem;
             padding: 1rem;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
             text-align: center;
+        }
+
+        /* TIGHTER HEATMAP GRID */
+        .heatmap-grid {
+            display: grid;
+            grid-template-columns: repeat(15, 1fr);
+            gap: 4px;
+            width: fit-content;
+        }
+        .habit-heatmap-grid {
+            display: grid;
+            grid-template-columns: repeat(11, 1fr);
+            gap: 3px;
+            width: fit-content;
+        }
+        .heatmap-cell {
+            aspect-ratio: 1;
+            width: 10px;
+            height: 10px;
+            border-radius: 2px;
+            background-color: var(--border-color);
+            transition: background-color 0.2s ease;
+        }
+        .heatmap-cell.completed { background-color: var(--accent-color); }
+        .heatmap-cell[data-level="1"] { background-color: rgba(200, 255, 87, 0.2); }
+        .heatmap-cell[data-level="2"] { background-color: rgba(200, 255, 87, 0.5); }
+        .heatmap-cell[data-level="3"] { background-color: var(--accent-color); }
+
+        /* COMPACT CARDS FOR STATS */
+        .stat-habit-card {
+            background-color: var(--surface-color);
+            border-radius: 0.5rem;
+            border: 1px solid var(--border-color);
+            padding: 0.6rem;
+        }
+
+        #textarea-notes {
+            line-height: 1.8;
+            font-size: 0.85rem;
         }
     </style>
 </head>
 <body class="theme-dark">
 
-    <header class="p-5 flex justify-between items-center shrink-0">
-        <div class="flex items-center gap-3">
+    <header class="p-6 flex justify-between items-center shrink-0">
+        <div class="flex items-center gap-4">
             <button id="btn-nav" class="soft-btn p-2 text-[color:var(--text-color)]" aria-label="Menu">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
             </button>
-            <h1 id="header-date" class="font-bold text-lg tracking-wide"></h1>
+            <h1 id="header-date" class="text-xl"></h1>
         </div>
         <button id="btn-theme" class="soft-btn p-2 text-[color:var(--text-color)]" aria-label="Toggle Theme">
-            <svg id="icon-sun" class="hidden" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
-            <svg id="icon-moon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+            <svg id="icon-sun" class="hidden" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+            <svg id="icon-moon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
         </button>
     </header>
 
+    <!-- Sidebar / Drawer Menu -->
     <div id="nav-menu" class="fixed inset-0 modal-overlay z-50 flex-col hidden justify-end">
-        <div class="bg-[color:var(--surface-color)] rounded-t-3xl p-6 pb-10 shadow-xl border-t border-[color:var(--border-color)] transition-transform duration-300 transform translate-y-full" id="nav-content">
+        <div class="bg-[color:var(--surface-color)] rounded-t-3xl p-6 pb-12 shadow-xl border-t border-[color:var(--border-color)] transition-transform duration-300 transform translate-y-full" id="nav-content">
             <div class="flex justify-between items-center mb-6">
-                <h2 class="text-xl font-bold">Navigation</h2>
+                <h2 class="text-2xl">Menu</h2>
                 <button id="btn-close-nav" class="p-2 bg-[color:var(--input-bg)] rounded-full text-[color:var(--muted-color)]">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
                 </button>
             </div>
+            
+            <div class="mb-8 p-5 soft-input rounded-xl flex flex-col items-center">
+                <div class="flex justify-between items-center w-full mb-4">
+                    <span class="text-[0.65rem] uppercase font-bold tracking-widest opacity-40">Activity History</span>
+                </div>
+                <div id="nav-heatmap" class="heatmap-grid"></div>
+            </div>
+
             <div class="space-y-3">
-                <button onclick="switchView('today')" class="w-full text-left p-4 rounded-xl soft-input flex items-center gap-3 font-semibold">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
-                    Daily Log
+                <button onclick="switchView('today')" class="w-full text-left p-4 rounded-xl soft-input flex items-center gap-4 font-semibold text-sm">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                    Daily Entry
                 </button>
-                <button onclick="switchView('history')" class="w-full text-left p-4 rounded-xl soft-input flex items-center gap-3 font-semibold">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="10" x2="21" y2="10"></line></svg>
-                    Archive
+                <button onclick="switchView('history')" class="w-full text-left p-4 rounded-xl soft-input flex items-center gap-4 font-semibold text-sm">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                    Archives
                 </button>
-                <button onclick="switchView('stats')" class="w-full text-left p-4 rounded-xl soft-input flex items-center gap-3 font-semibold">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
-                    Stats & Trends
+                <button onclick="switchView('stats')" class="w-full text-left p-4 rounded-xl soft-input flex items-center gap-4 font-semibold text-sm">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+                    Insights
                 </button>
             </div>
             <div class="mt-8 pt-6 border-t border-[color:var(--border-color)]">
-                <div class="text-[0.65rem] uppercase font-black tracking-widest opacity-30 text-center mb-4">Midnight reset active</div>
-                <button id="btn-debug-skip" class="w-full text-left p-4 rounded-xl bg-[color:var(--accent-color)] bg-opacity-10 text-[color:var(--accent-color)] flex items-center gap-3 font-bold border border-[color:var(--accent-color)] border-opacity-20">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 4 15 12 5 20 5 4"></polygon><line x1="19" y1="5" x2="19" y2="19"></line></svg>
-                    Debug: Force Archive Now
+                <button id="btn-debug-skip" class="w-full text-left p-4 rounded-xl bg-[color:var(--accent-color)] bg-opacity-10 text-[color:var(--text-color)] flex items-center gap-4 font-bold border border-[color:var(--accent-color)] border-opacity-30 text-xs">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 4 15 12 5 20 5 4"></polygon><line x1="19" y1="5" x2="19" y2="19"></line></svg>
+                    Archive Day Manually
                 </button>
             </div>
         </div>
     </div>
 
-    <main class="flex-1 overflow-y-auto px-5 pb-32 relative">
-        <div id="view-today" class="page-container active h-full space-y-8 pt-2">
-            <!-- TASKS SECTION -->
+    <main class="px-6 pb-32 relative">
+        <!-- Daily View -->
+        <div id="view-today" class="page-container active space-y-8 pt-2">
             <section id="section-tasks" class="space-y-4">
-                <div class="flex justify-between items-end mb-4 px-1">
-                    <h2 class="text-lg font-bold">Tasks</h2>
+                <div class="flex justify-between items-end mb-2 px-1">
+                    <h2 class="text-2xl">Tasks</h2>
                 </div>
-                <!-- Top Task Bar -->
                 <form id="form-task" class="flex gap-2 mb-4 relative">
-                    <input type="text" id="input-task" placeholder="New task..." class="soft-input py-3 px-4 flex-1 text-sm shadow-sm" autocomplete="off" enterkeyhint="done">
-                    <button type="submit" class="absolute right-2 top-1.5 bottom-1.5 bg-[color:var(--text-color)] text-[color:var(--bg-color)] rounded-lg px-3 flex items-center justify-center">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                    <input type="text" id="input-task" placeholder="Type a new task..." class="soft-input py-3 px-4 flex-1 text-sm" autocomplete="off" enterkeyhint="done">
+                    <button type="submit" class="absolute right-2 top-2 bottom-2 bg-[color:var(--accent-color)] text-black rounded px-3 flex items-center justify-center">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
                     </button>
                 </form>
                 <div id="task-list" class="space-y-3"></div>
             </section>
 
-            <!-- HABITS SECTION -->
             <section id="section-habits" class="hidden space-y-4">
-                <div class="flex justify-between items-center mb-4 px-1">
-                    <h2 class="text-lg font-bold">Habits</h2>
-                    <button onclick="openHabitManager()" class="text-xs bg-[color:var(--input-bg)] border border-[color:var(--border-color)] px-3 py-1.5 rounded-full text-[color:var(--muted-color)] font-bold">Manage</button>
+                <div class="flex justify-between items-center mb-2 px-1">
+                    <h2 class="text-2xl">Habits</h2>
+                    <button onclick="openHabitManager()" class="text-[0.6rem] font-black uppercase tracking-widest opacity-40 hover:opacity-100 transition-opacity">Edit</button>
                 </div>
                 <div id="habit-list" class="space-y-3"></div>
             </section>
 
-            <!-- NOTES SECTION -->
-            <section id="section-notes" class="hidden space-y-4 h-full flex flex-col">
-                <div class="flex justify-between items-center mb-4 px-1 shrink-0">
-                    <h2 class="text-lg font-bold">Daily Notes</h2>
+            <section id="section-notes" class="hidden space-y-4">
+                <div class="flex justify-between items-center mb-2 px-1 shrink-0">
+                    <h2 class="text-2xl text-[color:var(--accent-color)]">Reflections</h2>
                 </div>
-                <textarea id="textarea-notes" placeholder="Write anything here..." class="soft-input p-4 flex-1 text-sm shadow-sm min-h-[300px] resize-none leading-relaxed" spellcheck="false"></textarea>
-                <div class="text-[0.65rem] uppercase font-bold tracking-widest opacity-30 text-center py-2">Archives at midnight</div>
+                <textarea id="textarea-notes" placeholder="Write your thoughts for today..." class="soft-input p-6 w-full shadow-sm min-h-[400px] resize-none border-none bg-[color:var(--surface-color)]" spellcheck="false"></textarea>
             </section>
         </div>
 
-        <!-- HISTORY VIEW -->
-        <div id="view-history" class="page-container h-full pt-2">
-            <h2 class="text-xl font-bold mb-6">Archives</h2>
-            <div id="history-list" class="space-y-4"></div>
+        <!-- History List View -->
+        <div id="view-history" class="page-container pt-2">
+            <h2 class="text-2xl mb-6">Archives</h2>
+            <div id="history-list" class="space-y-3"></div>
         </div>
 
-        <!-- STATS VIEW -->
-        <div id="view-stats" class="page-container h-full pt-2">
-            <h2 class="text-xl font-bold mb-6">Performance</h2>
+        <!-- Stats View -->
+        <div id="view-stats" class="page-container pt-2">
+            <h2 class="text-2xl mb-6">Insights</h2>
             
             <div class="grid grid-cols-2 gap-4 mb-6">
                 <div class="stat-badge">
-                    <span class="text-[0.6rem] uppercase font-black opacity-40 mb-1">Lifetime Habits</span>
-                    <span id="stat-total-habits" class="text-2xl font-black">0</span>
-                    <span class="text-[0.6rem] opacity-60">Completed</span>
+                    <span class="text-[0.6rem] uppercase font-bold opacity-40 mb-2 block tracking-widest">Lifetime</span>
+                    <span id="stat-total-habits" class="text-4xl editorial-font">0</span>
+                    <span class="text-[0.6rem] opacity-40 block mt-1">Actions</span>
                 </div>
                 <div class="stat-badge">
-                    <span class="text-[0.6rem] uppercase font-black opacity-40 mb-1">Current Streak</span>
-                    <span id="stat-streak" class="text-2xl font-black text-[color:var(--accent-color)]">0</span>
-                    <span class="text-[0.6rem] opacity-60">Days</span>
+                    <span class="text-[0.6rem] uppercase font-bold opacity-40 mb-2 block tracking-widest">Streak</span>
+                    <span id="stat-streak" class="text-4xl editorial-font text-[color:var(--accent-color)]">0</span>
+                    <span class="text-[0.6rem] opacity-40 block mt-1">Days</span>
                 </div>
             </div>
 
-            <div class="soft-card p-6 mb-6">
-                <h3 class="text-xs font-bold uppercase opacity-40 mb-4 tracking-widest">Personal Best Day</h3>
-                <div id="stat-best-day-card" class="flex flex-col gap-2">
-                    <div id="stat-best-date" class="text-lg font-bold">No data yet</div>
-                    <div id="stat-best-details" class="text-sm opacity-60">Archive a day to see your peak.</div>
+            <div id="stats-habit-grids" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+            
+            <div class="soft-card p-6 mt-6 mb-6">
+                <h3 class="text-[0.65rem] font-bold uppercase opacity-30 mb-3 tracking-widest">Most Active Day</h3>
+                <div id="stat-best-day-card" class="flex flex-col gap-1">
+                    <div id="stat-best-date" class="text-lg editorial-font">No records yet</div>
+                    <div id="stat-best-details" class="text-xs opacity-50">Consistency is the key to clarity.</div>
                 </div>
             </div>
-            
-            <p class="text-[0.65rem] opacity-40 text-center uppercase font-black tracking-[0.2em] mt-10">Persistence is key</p>
         </div>
 
-        <!-- DETAIL VIEW -->
-        <div id="view-history-detail" class="page-container h-full pt-2">
+        <!-- Detail View -->
+        <div id="view-history-detail" class="page-container pt-2">
             <div class="flex items-center gap-4 mb-6">
-                <button onclick="switchView('history')" class="soft-btn p-2 rounded-full"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg></button>
-                <h2 id="history-detail-date" class="text-xl font-bold"></h2>
+                <button onclick="switchView('history')" class="soft-btn p-2 rounded-full"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg></button>
+                <h2 id="history-detail-date" class="text-2xl"></h2>
             </div>
             <div class="soft-card p-6 space-y-6">
                 <div id="hist-missed-section">
-                    <h3 class="text-xs font-bold uppercase text-[color:var(--accent-color)] mb-2">Missed</h3>
+                    <h3 class="text-[0.65rem] font-bold uppercase text-[color:var(--muted-color)] mb-3 tracking-widest">Unfinished</h3>
                     <ul id="hist-missed-list" class="space-y-2 text-sm opacity-80"></ul>
                 </div>
                 <div>
-                    <h3 class="text-xs font-bold uppercase text-[color:var(--success-color)] mb-2">Completed</h3>
-                    <ul id="hist-completed-list" class="space-y-2 text-sm opacity-80"></ul>
+                    <h3 class="text-[0.65rem] font-bold uppercase text-[color:var(--accent-color)] mb-3 tracking-widest">Completed</h3>
+                    <ul id="hist-completed-list" class="space-y-2 text-sm"></ul>
                 </div>
                 <div>
-                    <h3 class="text-xs font-bold uppercase text-[color:var(--muted-color)] mb-2">Habits</h3>
+                    <h3 class="text-[0.65rem] font-bold uppercase opacity-30 mb-3 tracking-widest">Habit Recap</h3>
                     <ul id="hist-habits-list" class="space-y-2 text-sm"></ul>
                 </div>
                 <div id="hist-notes-section">
-                    <h3 class="text-xs font-bold uppercase text-[color:var(--accent-color)] mb-2">Notes</h3>
-                    <div id="hist-notes-content" class="text-sm italic leading-relaxed whitespace-pre-wrap opacity-80 border-l-2 border-[color:var(--border-color)] pl-4"></div>
+                    <h3 class="text-[0.65rem] font-bold uppercase opacity-30 mb-3 tracking-widest">Reflections</h3>
+                    <div id="hist-notes-content" class="text-sm italic leading-relaxed whitespace-pre-wrap opacity-80 border-l border-[color:var(--border-color)] pl-5"></div>
                 </div>
             </div>
         </div>
     </main>
 
+    <!-- Navigation -->
     <nav id="bottom-tabs" class="bottom-nav">
         <button onclick="switchTab('tasks')" class="nav-item active" id="tab-tasks">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
             <span>TASKS</span>
         </button>
         <button onclick="switchTab('habits')" class="nav-item" id="tab-habits">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path></svg>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path></svg>
             <span>HABITS</span>
         </button>
         <button onclick="switchTab('notes')" class="nav-item" id="tab-notes">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121(3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
             <span>NOTES</span>
         </button>
     </nav>
 
+    <!-- Modals -->
     <div id="modal-manage-habits" class="fixed inset-0 modal-overlay z-50 flex flex-col justify-end hidden">
         <div class="bg-[color:var(--surface-color)] rounded-t-3xl p-6 pb-12 shadow-2xl border-t border-[color:var(--border-color)] h-[60vh] flex flex-col transition-transform duration-300 transform translate-y-full" id="habit-content">
             <div class="flex justify-between items-center mb-6">
-                <h2 class="text-xl font-bold">Manage Habits</h2>
+                <h2 class="text-2xl">Edit Habits</h2>
                 <button onclick="closeHabitManager()" class="p-2 bg-[color:var(--input-bg)] rounded-full text-[color:var(--muted-color)]"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
             </div>
             <form id="form-manage-habit" class="flex gap-2 mb-6 relative">
-                <input type="text" id="input-manage-habit" placeholder="New habit..." class="soft-input py-3 px-4 flex-1 text-sm shadow-sm" autocomplete="off" enterkeyhint="done">
-                <button type="submit" class="bg-[color:var(--success-color)] text-white rounded-lg px-4 font-bold">Add</button>
+                <input type="text" id="input-manage-habit" placeholder="Add a ritual..." class="soft-input py-3 px-4 flex-1 text-sm" autocomplete="off" enterkeyhint="done">
+                <button type="submit" class="bg-[color:var(--accent-color)] text-black rounded px-4 text-xs font-bold uppercase tracking-widest">Add</button>
             </form>
             <div id="manage-habit-list" class="flex-1 overflow-y-auto space-y-2"></div>
         </div>
     </div>
 
     <script>
-        const STORAGE_KEY = 'soft_journal_v8_stable';
+        const STORAGE_KEY = 'editorial_journal_v1';
         let state = { theme: 'dark', lastOpenedDate: '', tasks: [], habits: [], habitStatus: {}, notes: '', history: {} };
         let currentTab = 'tasks';
 
@@ -352,15 +398,15 @@
             osc.connect(gain); gain.connect(audioCtx.destination);
             const now = audioCtx.currentTime;
             if (type === 'pop') {
-                osc.type = 'sine'; osc.frequency.setValueAtTime(400, now); osc.frequency.exponentialRampToValueAtTime(150, now + 0.15);
-                gain.gain.setValueAtTime(0.15, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
-                osc.start(now); osc.stop(now + 0.15);
+                osc.type = 'sine'; osc.frequency.setValueAtTime(300, now); osc.frequency.exponentialRampToValueAtTime(100, now + 0.1);
+                gain.gain.setValueAtTime(0.1, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+                osc.start(now); osc.stop(now + 0.1);
             } else if (type === 'tick') {
-                osc.type = 'sine'; osc.frequency.setValueAtTime(800, now); osc.frequency.exponentialRampToValueAtTime(1200, now + 0.05);
-                gain.gain.setValueAtTime(0.05, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
-                osc.start(now); osc.stop(now + 0.05);
+                osc.type = 'sine'; osc.frequency.setValueAtTime(500, now); osc.frequency.exponentialRampToValueAtTime(800, now + 0.04);
+                gain.gain.setValueAtTime(0.04, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.04);
+                osc.start(now); osc.stop(now + 0.04);
             } else {
-                osc.type = 'sine'; osc.frequency.setValueAtTime(150, now); gain.gain.setValueAtTime(0.1, now);
+                osc.type = 'sine'; osc.frequency.setValueAtTime(120, now); gain.gain.setValueAtTime(0.08, now);
                 gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
                 osc.start(now); osc.stop(now + 0.1);
             }
@@ -387,9 +433,8 @@
             localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
         }
 
-        function getLocalDateString() {
-            const now = new Date();
-            return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        function getLocalDateString(dateObj = new Date()) {
+            return `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
         }
 
         function checkAndResetDay() {
@@ -435,14 +480,14 @@
 
         function renderToday() {
             const tList = document.getElementById('task-list');
-            tList.innerHTML = state.tasks.length ? '' : '<div class="text-center py-8 opacity-40 text-sm italic">New day, new goals.</div>';
+            tList.innerHTML = state.tasks.length ? '' : '<div class="text-center py-12 opacity-30 text-xs tracking-widest uppercase">Start your journal</div>';
             state.tasks.forEach(t => {
                 const div = document.createElement('div');
-                div.className = 'soft-card p-4 flex items-center gap-4 animate-slide-up';
+                div.className = 'soft-card p-4 flex items-center gap-4 border-none';
                 div.innerHTML = `
                     <input type="checkbox" class="soft-checkbox" ${t.completed ? 'checked' : ''}>
-                    <span class="flex-1 font-semibold ${t.completed ? 'strike-through opacity-50' : ''}">${t.text}</span>
-                    <button class="opacity-30 hover:opacity-100"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>
+                    <span class="flex-1 font-medium text-sm ${t.completed ? 'strike-through opacity-40' : ''}">${t.text}</span>
+                    <button class="opacity-20 hover:opacity-100 p-1"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"></path></svg></button>
                 `;
                 div.querySelector('input').onclick = () => { 
                     t.completed = !t.completed; 
@@ -458,14 +503,14 @@
             });
 
             const hList = document.getElementById('habit-list');
-            hList.innerHTML = state.habits.length ? '' : '<div class="text-center py-8 opacity-40 text-sm italic">Add habits to track.</div>';
+            hList.innerHTML = state.habits.length ? '' : '<div class="text-center py-12 opacity-30 text-xs tracking-widest uppercase">Define your rituals</div>';
             state.habits.forEach(h => {
                 const checked = state.habitStatus[h.id];
                 const div = document.createElement('div');
-                div.className = 'soft-card p-4 flex items-center gap-4 animate-slide-up';
+                div.className = 'soft-card p-4 flex items-center gap-4 border-none';
                 div.innerHTML = `
                     <input type="checkbox" class="soft-checkbox habit-check" ${checked ? 'checked' : ''}>
-                    <span class="flex-1 font-semibold ${checked ? 'text-[color:var(--success-color)]' : ''}">${h.text}</span>
+                    <span class="flex-1 font-medium text-sm ${checked ? 'opacity-40' : ''}">${h.text}</span>
                 `;
                 div.querySelector('input').onclick = () => { 
                     state.habitStatus[h.id] = !checked; 
@@ -480,46 +525,117 @@
             let totalHabitsDone = 0;
             let bestDay = null;
             let maxCompleted = -1;
-            
             const dates = Object.keys(state.history).sort((a,b) => new Date(a) - new Date(b));
-            
             dates.forEach(date => {
                 const entry = state.history[date];
                 const habitsDone = entry.habits.filter(h => h.completed).length;
                 totalHabitsDone += habitsDone;
-
                 const completedCount = entry.completedTasks.length + habitsDone;
                 if (completedCount >= maxCompleted) {
                     maxCompleted = completedCount;
                     bestDay = { date, count: completedCount, habits: habitsDone, tasks: entry.completedTasks.length };
                 }
             });
-
-            // Calculate Streak
             let streak = 0;
             const todayStr = getLocalDateString();
             let checkDate = new Date();
-            
             while (true) {
-                const dateStr = `${checkDate.getFullYear()}-${String(checkDate.getMonth() + 1).padStart(2, '0')}-${String(checkDate.getDate()).padStart(2, '0')}`;
-                // Check history or if today has activity
-                const hasActivityToday = dateStr === todayStr && (state.tasks.some(t => t.completed) || Object.values(state.habitStatus).some(v => v));
+                const dateStr = getLocalDateString(checkDate);
+                const isToday = dateStr === todayStr;
+                const entry = state.history[dateStr];
+                const hasActivityToday = isToday && (state.tasks.some(t => t.completed) || Object.values(state.habitStatus).some(v => v));
                 
-                if (state.history[dateStr] || hasActivityToday) {
+                if (entry || hasActivityToday) {
                     streak++;
                     checkDate.setDate(checkDate.getDate() - 1);
-                } else {
-                    break;
-                }
+                } else { break; }
             }
-
-            // Update UI
             document.getElementById('stat-total-habits').textContent = totalHabitsDone;
             document.getElementById('stat-streak').textContent = streak;
-            
             if (bestDay) {
                 document.getElementById('stat-best-date').textContent = formatDateStr(bestDay.date);
-                document.getElementById('stat-best-details').textContent = `${bestDay.tasks} tasks & ${bestDay.habits} habits completed.`;
+                document.getElementById('stat-best-details').textContent = `${bestDay.tasks} tasks & ${bestDay.habits} habits.`;
+            }
+            renderHabitStats();
+        }
+
+        function renderHabitStats() {
+            const container = document.getElementById('stats-habit-grids');
+            container.innerHTML = '';
+            if (state.habits.length === 0) {
+                container.innerHTML = '<div class="col-span-full text-center py-10 opacity-30 text-xs tracking-widest">NO DATA TO SHOW</div>';
+                return;
+            }
+            
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = now.getMonth();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            const monthName = now.toLocaleString('default', { month: 'short' }).toUpperCase();
+            const todayStr = getLocalDateString();
+
+            state.habits.forEach(habit => {
+                const card = document.createElement('div');
+                card.className = 'stat-habit-card flex flex-col items-center border-none shadow-md';
+                let completedThisMonth = 0;
+                let cellsHtml = '';
+
+                for (let i = 1; i <= daysInMonth; i++) {
+                    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+                    const isToday = dateStr === todayStr;
+                    let isCompleted = false;
+
+                    if (isToday) {
+                        isCompleted = state.habitStatus[habit.id] || false;
+                    } else if (state.history[dateStr]) {
+                        const histHabit = state.history[dateStr].habits.find(h => h.id === habit.id);
+                        isCompleted = histHabit ? histHabit.completed : false;
+                    }
+
+                    if (isCompleted) completedThisMonth++;
+                    cellsHtml += `<div class="heatmap-cell ${isCompleted ? 'completed' : ''}" title="${dateStr}"></div>`;
+                }
+
+                card.innerHTML = `
+                    <div class="flex justify-between items-center w-full mb-3">
+                        <h4 class="font-bold text-[0.7rem] truncate mr-2 tracking-tight">${habit.text}</h4>
+                        <div class="text-[0.5rem] font-black opacity-30 tracking-widest shrink-0">
+                            ${completedThisMonth}D
+                        </div>
+                    </div>
+                    <div class="habit-heatmap-grid mb-2">${cellsHtml}</div>
+                    <div class="w-full text-left text-[0.5rem] opacity-20 tracking-tighter">${monthName} ${year}</div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function renderHeatmap() {
+            const container = document.getElementById('nav-heatmap');
+            container.innerHTML = '';
+            const daysToShow = 75; 
+            const today = new Date();
+            for (let i = daysToShow - 1; i >= 0; i--) {
+                const d = new Date();
+                d.setDate(today.getDate() - i);
+                const dateStr = getLocalDateString(d);
+                const cell = document.createElement('div');
+                cell.className = 'heatmap-cell';
+                const histEntry = state.history[dateStr];
+                const isToday = dateStr === getLocalDateString();
+                let completionCount = 0;
+                if (histEntry) {
+                    completionCount = histEntry.habits.filter(h => h.completed).length + histEntry.completedTasks.length;
+                } else if (isToday) {
+                    completionCount = Object.values(state.habitStatus).filter(v => v).length + state.tasks.filter(t => t.completed).length;
+                }
+                if (completionCount > 0) {
+                    if (completionCount >= 5) cell.setAttribute('data-level', '3');
+                    else if (completionCount >= 3) cell.setAttribute('data-level', '2');
+                    else cell.setAttribute('data-level', '1');
+                }
+                cell.title = `${formatDateStr(dateStr)}: ${completionCount} items`;
+                container.appendChild(cell);
             }
         }
 
@@ -528,7 +644,6 @@
             document.querySelectorAll('.page-container').forEach(el => el.classList.remove('active'));
             const header = document.getElementById('header-date');
             const bottomNav = document.getElementById('bottom-tabs');
-            
             if (viewId === 'today') {
                 header.textContent = formatDateStr(state.lastOpenedDate);
                 document.getElementById('view-today').classList.add('active');
@@ -539,7 +654,7 @@
                 document.getElementById('view-history').classList.add('active');
                 bottomNav.classList.add('hidden');
             } else if (viewId === 'stats') {
-                header.textContent = 'Stats';
+                header.textContent = 'Insights';
                 calculateStats();
                 document.getElementById('view-stats').classList.add('active');
                 bottomNav.classList.add('hidden');
@@ -548,6 +663,7 @@
                 bottomNav.classList.add('hidden');
             }
             closeNav();
+            window.scrollTo(0, 0);
         }
 
         function switchTab(tabId) {
@@ -559,6 +675,7 @@
             document.getElementById('tab-tasks').classList.toggle('active', tabId === 'tasks');
             document.getElementById('tab-habits').classList.toggle('active', tabId === 'habits');
             document.getElementById('tab-notes').classList.toggle('active', tabId === 'notes');
+            window.scrollTo(0, 0);
         }
 
         function renderHistoryList() {
@@ -566,13 +683,13 @@
             list.innerHTML = '';
             const dates = Object.keys(state.history).sort((a,b) => new Date(b) - new Date(a));
             if (!dates.length) {
-                list.innerHTML = '<div class="text-center py-20 opacity-30 text-sm">No archives yet. Come back tomorrow!</div>';
+                list.innerHTML = '<div class="text-center py-20 opacity-20 text-xs uppercase tracking-widest">No entries found</div>';
                 return;
             }
             dates.forEach(d => {
                 const div = document.createElement('button');
-                div.className = 'w-full soft-card p-4 text-left flex justify-between items-center';
-                div.innerHTML = `<span>${formatDateStr(d)}</span> <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>`;
+                div.className = 'w-full soft-card p-4 text-left flex justify-between items-center text-sm border-none shadow-sm';
+                div.innerHTML = `<span class="font-medium">${formatDateStr(d)}</span> <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>`;
                 div.onclick = () => { playSoftSound('click'); renderHistoryDetail(d); };
                 list.appendChild(div);
             });
@@ -582,21 +699,19 @@
             const data = state.history[date];
             document.getElementById('history-detail-date').textContent = formatDateStr(date);
             const mList = document.getElementById('hist-missed-list');
-            mList.innerHTML = data.missedTasks.length ? '' : 'None! 🎉';
-            data.missedTasks.forEach(t => mList.innerHTML += `<li>• ${t.text}</li>`);
+            mList.innerHTML = data.missedTasks.length ? '' : 'No pending tasks.';
+            data.missedTasks.forEach(t => mList.innerHTML += `<li>— ${t.text}</li>`);
             const cList = document.getElementById('hist-completed-list');
             cList.innerHTML = '';
-            data.completedTasks.forEach(t => cList.innerHTML += `<li>• ${t.text}</li>`);
+            data.completedTasks.forEach(t => cList.innerHTML += `<li>— ${t.text}</li>`);
             const hList = document.getElementById('hist-habits-list');
             hList.innerHTML = '';
-            data.habits.forEach(h => hList.innerHTML += `<li class="${h.completed ? 'text-[color:var(--success-color)] font-bold' : 'opacity-40'}">${h.completed ? '✓' : '○'} ${h.text}</li>`);
+            data.habits.forEach(h => hList.innerHTML += `<li class="${h.completed ? 'opacity-100 font-bold' : 'opacity-20'}">${h.completed ? '●' : '○'} ${h.text}</li>`);
             const nContent = document.getElementById('hist-notes-content');
             const nSection = document.getElementById('hist-notes-section');
             if (data.notes && data.notes.trim()) {
                 nSection.classList.remove('hidden'); nContent.textContent = data.notes;
-            } else {
-                nSection.classList.add('hidden');
-            }
+            } else { nSection.classList.add('hidden'); }
             switchView('history-detail');
         }
 
@@ -604,7 +719,7 @@
             if (!s) return '';
             const parts = s.split('-');
             const d = new Date(parts[0], parts[1]-1, parts[2]);
-            return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+            return d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
         }
 
         function setupEvents() {
@@ -628,12 +743,10 @@
                 }
                 document.getElementById('input-manage-habit').value = '';
             };
-            document.getElementById('textarea-notes').oninput = (e) => {
-                state.notes = e.target.value;
-                saveState();
-            };
+            document.getElementById('textarea-notes').oninput = (e) => { state.notes = e.target.value; saveState(); };
             document.getElementById('btn-nav').onclick = () => {
                 playSoftSound('click');
+                renderHeatmap(); 
                 const nav = document.getElementById('nav-menu');
                 nav.classList.remove('hidden'); nav.classList.add('flex');
                 setTimeout(() => document.getElementById('nav-content').classList.remove('translate-y-full'), 10);
@@ -645,18 +758,14 @@
                 applyTheme(); saveState(); 
             };
             document.getElementById('btn-debug-skip').onclick = () => {
-                playSoftSound('pop');
-                archiveDay();
+                playSoftSound('pop'); archiveDay();
                 const parts = state.lastOpenedDate.split('-');
                 const d = new Date(parts[0], parts[1]-1, parts[2]);
                 d.setDate(d.getDate() + 1);
-                state.lastOpenedDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-                saveState(); 
-                updateHeaderDate();
-                renderToday();
+                state.lastOpenedDate = getLocalDateString(d);
+                saveState(); updateHeaderDate(); renderToday();
                 document.getElementById('textarea-notes').value = '';
-                closeNav();
-                switchView('today');
+                closeNav(); switchView('today');
             };
         }
 
@@ -682,8 +791,8 @@
             list.innerHTML = '';
             state.habits.forEach(h => {
                 const div = document.createElement('div');
-                div.className = 'soft-input p-3 flex justify-between items-center font-bold';
-                div.innerHTML = `<span>${h.text}</span> <button class="text-[color:var(--accent-color)]">Del</button>`;
+                div.className = 'soft-input p-3 flex justify-between items-center text-sm font-medium';
+                div.innerHTML = `<span>${h.text}</span> <button class="text-[color:var(--accent-color)] opacity-60 font-bold p-1 uppercase text-[0.6rem] tracking-widest">Delete</button>`;
                 div.querySelector('button').onclick = () => { 
                     playSoftSound('tick');
                     state.habits = state.habits.filter(x => x.id !== h.id); 
