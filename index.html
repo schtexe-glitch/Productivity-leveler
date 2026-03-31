@@ -1,816 +1,1134 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Daily Journal</title>
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 
-    <!-- PWA Meta Tags -->
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="theme-color" content="#0f172a">
-    
-    <!-- Service Worker Registration -->
-    <script>
-        if ("serviceWorker" in navigator) {
-            window.addEventListener("load", () => {
-                navigator.serviceWorker.register("/sw.js")
-                    .then(() => console.log("SW registered"))
-                    .catch(err => console.log("SW error:", err));
-            });
+// ─── Utility ──────────────────────────────────────────────────────────────────
+const pad = (n) => String(n).padStart(2, '0');
+const todayStr = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+};
+const dateLabel = (d = new Date()) =>
+  d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+
+const STORAGE_KEY = 'pulse_v2';
+
+const defaultState = () => ({
+  habits: [],
+  habitLogs: {},   // { "YYYY-MM-DD": { [habitId]: true } }
+  todos: [],       // [{ id, text, completed, createdAt }]
+  archive: {},     // { "YYYY-MM-DD": { habits: [...], todos: [...] } }
+  lastActiveDate: todayStr(),
+});
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return defaultState();
+    return { ...defaultState(), ...JSON.parse(raw) };
+  } catch { return defaultState(); }
+}
+
+function saveState(state) {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {}
+}
+
+// ─── Icons (inline SVG) ───────────────────────────────────────────────────────
+const Icon = ({ d, size = 20, stroke = 'currentColor', fill = 'none', strokeWidth = 1.75 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill={fill} stroke={stroke} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+    <path d={d} />
+  </svg>
+);
+
+const Icons = {
+  habits:   () => <Icon d="M9 12l2 2 4-4M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />,
+  tasks:    () => <Icon d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />,
+  stats:    () => <Icon d="M3 3v18h18M9 17V9m4 8v-4m4 4v-7" />,
+  plus:     () => <Icon d="M12 5v14M5 12h14" />,
+  trash:    () => <Icon d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" size={16} />,
+  check:    () => <Icon d="M5 13l4 4L19 7" size={16} strokeWidth={2.5} />,
+  sun:      () => <Icon d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42M12 17a5 5 0 100-10 5 5 0 000 10z" />,
+  archive:  () => <Icon d="M21 8v13H3V8M1 3h22v5H1zM10 12h4" />,
+  search:   () => <Icon d="M21 21l-4.35-4.35M17 11A6 6 0 115 11a6 6 0 0112 0z" />,
+  flame:    () => <Icon d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.974 7.974 0 01-2.343 5.657z" fill="currentColor" stroke="none" />,
+  close:    () => <Icon d="M18 6L6 18M6 6l12 12" size={18} />,
+};
+
+// ─── Main App ─────────────────────────────────────────────────────────────────
+export default function App() {
+  const [state, setState] = useState(() => loadState());
+  const [tab, setTab] = useState('tasks');
+  const [statsView, setStatsView] = useState('heatmap');
+  const [newHabit, setNewHabit] = useState('');
+  const [showHabitModal, setShowHabitModal] = useState(false);
+  const [newTodo, setNewTodo] = useState('');
+  const [archiveDateQuery, setArchiveDateQuery] = useState('');
+  const [archiveResult, setArchiveResult] = useState(null);
+  const habitInputRef = useRef(null);
+  const todoInputRef = useRef(null);
+
+  // ── PWA & Meta Tags Injection ──────────────────────────────────────────────
+  useEffect(() => {
+    // Add Meta Tags
+    const metaTags = [
+      { name: "apple-mobile-web-app-capable", content: "yes" },
+      { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
+      { name: "theme-color", content: "#0f172a" }
+    ];
+
+    metaTags.forEach(tag => {
+      let element = document.querySelector(`meta[name="${tag.name}"]`);
+      if (!element) {
+        element = document.createElement('meta');
+        element.setAttribute('name', tag.name);
+        document.head.appendChild(element);
+      }
+      element.setAttribute('content', tag.content);
+    });
+
+    // Service Worker Registration
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js")
+        .then(() => console.log("SW registered"))
+        .catch(err => console.log("SW error:", err));
+    }
+  }, []);
+
+  // Persist on every state change
+  useEffect(() => { saveState(state); }, [state]);
+
+  // ── Midnight Reset Logic ───────────────────────────────────────────────────
+  const performDayRollover = useCallback((prevDateStr, newDateStr, st) => {
+    // Archive the previous day
+    const archivedHabits = st.habits.map(h => ({
+      ...h,
+      completed: !!(st.habitLogs[prevDateStr]?.[h.id])
+    }));
+    const archivedTodos = st.todos.map(t => ({ ...t }));
+
+    return {
+      ...st,
+      archive: {
+        ...st.archive,
+        [prevDateStr]: { habits: archivedHabits, todos: archivedTodos }
+      },
+      todos: [],           // clear todos for new day
+      lastActiveDate: newDateStr,
+    };
+    // habitLogs for new day start empty (unchecked) automatically
+  }, []);
+
+  useEffect(() => {
+    // Check once on mount and every 30s
+    const check = () => {
+      const now = todayStr();
+      setState(prev => {
+        if (prev.lastActiveDate !== now) {
+          return performDayRollover(prev.lastActiveDate, now, prev);
         }
-    </script>
-    
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    
-    <style>
-        :root {
-            --bg-color: #fcfcfc;
-            --surface-color: #ffffff;
-            --text-color: #1a1a1a;
-            --border-color: #eeeeee;
-            --shadow-color: rgba(0, 0, 0, 0.05);
-            --accent-color: #c8ff57; 
-            --success-color: #c8ff57; 
-            --muted-color: #888888;
-            --input-bg: #f5f5f5;
-            --heading-font: 'DM Serif Display', serif;
-            --body-font: 'Inter', sans-serif;
+        return prev;
+      });
+    };
+    check();
+    const timer = setInterval(check, 30_000);
+    return () => clearInterval(timer);
+  }, [performDayRollover]);
+
+  // Focus habit input when modal opens
+  useEffect(() => {
+    if (showHabitModal) setTimeout(() => habitInputRef.current?.focus(), 50);
+  }, [showHabitModal]);
+
+  // ── Computed ───────────────────────────────────────────────────────────────
+  const today = todayStr();
+  const todayLogs = state.habitLogs[today] || {};
+  const completedHabits = state.habits.filter(h => todayLogs[h.id]).length;
+  const totalHabits = state.habits.length;
+  const completedTodos = state.todos.filter(t => t.completed).length;
+  const totalTodos = state.todos.length;
+  const streakScore = totalHabits > 0 ? Math.round((completedHabits / totalHabits) * 100) : 0;
+
+  // ── Handlers ──────────────────────────────────────────────────────────────
+  const addHabit = () => {
+    if (!newHabit.trim()) return;
+    setState(prev => ({
+      ...prev,
+      habits: [...prev.habits, { id: `h_${Date.now()}`, name: newHabit.trim(), createdAt: today }]
+    }));
+    setNewHabit('');
+    setShowHabitModal(false);
+  };
+
+  const deleteHabit = (id) => {
+    setState(prev => ({
+      ...prev,
+      habits: prev.habits.filter(h => h.id !== id),
+    }));
+  };
+
+  const toggleHabit = (id) => {
+    setState(prev => {
+      const dayLogs = prev.habitLogs[today] || {};
+      return {
+        ...prev,
+        habitLogs: {
+          ...prev.habitLogs,
+          [today]: { ...dayLogs, [id]: !dayLogs[id] }
         }
+      };
+    });
+  };
 
-        body.theme-dark {
-            --bg-color: #0a0a0a;
-            --surface-color: #141414;
-            --text-color: #efefef;
-            --border-color: #222222;
-            --shadow-color: rgba(0, 0, 0, 0.4);
-            --accent-color: #c8ff57;
-            --success-color: #c8ff57;
-            --muted-color: #666666;
-            --input-bg: #1a1a1a;
-        }
+  const addTodo = () => {
+    if (!newTodo.trim()) return;
+    setState(prev => ({
+      ...prev,
+      todos: [{ id: `t_${Date.now()}`, text: newTodo.trim(), completed: false, createdAt: Date.now() }, ...prev.todos]
+    }));
+    setNewTodo('');
+    todoInputRef.current?.focus();
+  };
 
-        body {
-            font-family: var(--body-font);
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            transition: background-color 0.4s ease, color 0.4s ease;
-            -webkit-tap-highlight-color: transparent;
-            min-height: 100vh;
-            width: 100vw;
-            overflow-y: auto;
-            overflow-x: hidden;
-        }
+  const toggleTodo = (id) => {
+    setState(prev => ({
+      ...prev,
+      todos: prev.todos.map(t => t.id === id ? { ...t, completed: !t.completed } : t)
+    }));
+  };
 
-        h1, h2, h3, .editorial-font {
-            font-family: var(--heading-font);
-        }
+  const deleteTodo = (id, e) => {
+    e.stopPropagation();
+    setState(prev => ({ ...prev, todos: prev.todos.filter(t => t.id !== id) }));
+  };
 
-        .soft-card {
-            background-color: var(--surface-color);
-            border-radius: 0.5rem;
-            box-shadow: 0 4px 12px var(--shadow-color);
-            border: 1px solid var(--border-color);
-        }
-        
-        .soft-input {
-            background-color: var(--input-bg);
-            border: 1px solid var(--border-color);
-            color: var(--text-color);
-            outline: none;
-            border-radius: 0.4rem;
-            transition: all 0.2s ease;
-        }
+  const lookupArchive = () => {
+    setArchiveResult(archiveDateQuery ? (state.archive[archiveDateQuery] || null) : null);
+  };
 
-        .soft-btn {
-            background-color: var(--surface-color);
-            border: 1px solid var(--border-color);
-            border-radius: 0.4rem;
-            transition: all 0.2s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        
-        .soft-btn:active { transform: scale(0.96); }
+  // ── Monthly calendar heatmap data ─────────────────────────────────────────
+  const [heatmapMonth, setHeatmapMonth] = useState(() => {
+    const n = new Date();
+    return { year: n.getFullYear(), month: n.getMonth() };
+  });
 
-        .soft-checkbox {
-            appearance: none;
-            width: 20px;
-            height: 20px;
-            border: 1.5px solid var(--border-color);
-            border-radius: 4px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            background: var(--input-bg);
-            flex-shrink: 0;
-            transition: all 0.2s ease;
-        }
-        
-        .soft-checkbox.habit-check { border-radius: 50%; }
-        .soft-checkbox:checked { background-color: var(--accent-color); border-color: var(--accent-color); }
-        .soft-checkbox:checked::after {
-            content: ''; width: 5px; height: 9px; border: solid #000;
-            border-width: 0 2.5px 2.5px 0; transform: rotate(45deg); margin-bottom: 2px;
-        }
+  const getMonthHeatmap = (habitId) => {
+    const { year, month } = heatmapMonth;
+    const firstDay = new Date(year, month, 1);
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    // 0=Sun…6=Sat → shift so Mon=0
+    const startOffset = (firstDay.getDay() + 6) % 7;
+    const cells = [];
+    for (let i = 0; i < startOffset; i++) cells.push(null); // empty prefix
+    for (let d = 1; d <= daysInMonth; d++) {
+      const str = `${year}-${pad(month + 1)}-${pad(d)}`;
+      const dateObj = new Date(year, month, d);
+      const isToday = str === today;
+      const isFuture = dateObj > new Date();
+      cells.push({ day: d, dateStr: str, done: !!(state.habitLogs[str]?.[habitId]), isToday, isFuture });
+    }
+    return cells;
+  };
 
-        .page-container { display: none; animation: fadeIn 0.4s ease forwards; }
-        .page-container.active { display: flex; flex-direction: column; }
+  const prevMonth = () => setHeatmapMonth(({ year, month }) => month === 0 ? { year: year - 1, month: 11 } : { year, month: month - 1 });
+  const nextMonth = () => {
+    const now = new Date();
+    setHeatmapMonth(prev => {
+      if (prev.year === now.getFullYear() && prev.month === now.getMonth()) return prev;
+      return prev.month === 11 ? { year: prev.year + 1, month: 0 } : { year: prev.year, month: prev.month + 1 };
+    });
+  };
+  const isCurrentMonth = () => { const n = new Date(); return heatmapMonth.year === n.getFullYear() && heatmapMonth.month === n.getMonth(); };
 
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  const getStreak = (habitId) => {
+    let streak = 0;
+    const now = new Date();
+    for (let i = 0; i < 365; i++) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - i);
+      const str = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+      if (state.habitLogs[str]?.[habitId]) streak++;
+      else break;
+    }
+    return streak;
+  };
 
-        .modal-overlay { backdrop-filter: blur(8px); background-color: rgba(0,0,0,0.4); transition: all 0.3s ease; }
+  // ─── Render ───────────────────────────────────────────────────────────────
+  return (
+    <div style={styles.root}>
+      <style>{css}</style>
 
-        .strike-through { text-decoration: line-through; color: var(--muted-color); font-style: italic; }
-
-        .bottom-nav {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background-color: var(--surface-color);
-            border-top: 1px solid var(--border-color);
-            display: flex;
-            justify-content: space-around;
-            padding: 0.75rem 0.5rem calc(0.75rem + env(safe-area-inset-bottom));
-            z-index: 40;
-        }
-
-        .nav-item {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 4px;
-            color: var(--muted-color);
-            font-size: 0.6rem;
-            font-weight: 700;
-            letter-spacing: 0.05em;
-            transition: color 0.2s ease;
-            flex: 1;
-        }
-
-        .nav-item.active { color: var(--text-color); }
-        .nav-item.active svg { color: var(--accent-color); }
-
-        .stat-badge {
-            background: var(--surface-color);
-            border: 1px solid var(--border-color);
-            border-radius: 0.5rem;
-            padding: 1rem;
-            text-align: center;
-        }
-
-        /* TIGHTER HEATMAP GRID */
-        .heatmap-grid {
-            display: grid;
-            grid-template-columns: repeat(15, 1fr);
-            gap: 4px;
-            width: fit-content;
-        }
-        .habit-heatmap-grid {
-            display: grid;
-            grid-template-columns: repeat(11, 1fr);
-            gap: 3px;
-            width: fit-content;
-        }
-        .heatmap-cell {
-            aspect-ratio: 1;
-            width: 10px;
-            height: 10px;
-            border-radius: 2px;
-            background-color: var(--border-color);
-            transition: background-color 0.2s ease;
-        }
-        .heatmap-cell.completed { background-color: var(--accent-color); }
-        .heatmap-cell[data-level="1"] { background-color: rgba(200, 255, 87, 0.2); }
-        .heatmap-cell[data-level="2"] { background-color: rgba(200, 255, 87, 0.5); }
-        .heatmap-cell[data-level="3"] { background-color: var(--accent-color); }
-
-        /* COMPACT CARDS FOR STATS */
-        .stat-habit-card {
-            background-color: var(--surface-color);
-            border-radius: 0.5rem;
-            border: 1px solid var(--border-color);
-            padding: 0.6rem;
-        }
-
-        #textarea-notes {
-            line-height: 1.8;
-            font-size: 0.85rem;
-        }
-    </style>
-</head>
-<body class="theme-dark">
-
-    <header class="p-6 flex justify-between items-center shrink-0">
-        <div class="flex items-center gap-4">
-            <button id="btn-nav" class="soft-btn p-2 text-[color:var(--text-color)]" aria-label="Menu">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
-            </button>
-            <h1 id="header-date" class="text-xl"></h1>
+      {/* ── Header ── */}
+      <header style={styles.header}>
+        <div>
+          <div style={styles.appName}>PULSE</div>
+          <div style={styles.dateLabel}>{dateLabel()}</div>
         </div>
-        <button id="btn-theme" class="soft-btn p-2 text-[color:var(--text-color)]" aria-label="Toggle Theme">
-            <svg id="icon-sun" class="hidden" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
-            <svg id="icon-moon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
-        </button>
-    </header>
-
-    <!-- Sidebar / Drawer Menu -->
-    <div id="nav-menu" class="fixed inset-0 modal-overlay z-50 flex-col hidden justify-end">
-        <div class="bg-[color:var(--surface-color)] rounded-t-3xl p-6 pb-12 shadow-xl border-t border-[color:var(--border-color)] transition-transform duration-300 transform translate-y-full" id="nav-content">
-            <div class="flex justify-between items-center mb-6">
-                <h2 class="text-2xl">Menu</h2>
-                <button id="btn-close-nav" class="p-2 bg-[color:var(--input-bg)] rounded-full text-[color:var(--muted-color)]">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                </button>
-            </div>
-            
-            <div class="mb-8 p-5 soft-input rounded-xl flex flex-col items-center">
-                <div class="flex justify-between items-center w-full mb-4">
-                    <span class="text-[0.65rem] uppercase font-bold tracking-widest opacity-40">Activity History</span>
-                </div>
-                <div id="nav-heatmap" class="heatmap-grid"></div>
-            </div>
-
-            <div class="space-y-3">
-                <button onclick="switchView('today')" class="w-full text-left p-4 rounded-xl soft-input flex items-center gap-4 font-semibold text-sm">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
-                    Daily Entry
-                </button>
-                <button onclick="switchView('history')" class="w-full text-left p-4 rounded-xl soft-input flex items-center gap-4 font-semibold text-sm">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="10" x2="21" y2="10"></line></svg>
-                    Archives
-                </button>
-                <button onclick="switchView('stats')" class="w-full text-left p-4 rounded-xl soft-input flex items-center gap-4 font-semibold text-sm">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
-                    Insights
-                </button>
-            </div>
-            <div class="mt-8 pt-6 border-t border-[color:var(--border-color)]">
-                <button id="btn-debug-skip" class="w-full text-left p-4 rounded-xl bg-[color:var(--accent-color)] bg-opacity-10 text-[color:var(--text-color)] flex items-center gap-4 font-bold border border-[color:var(--accent-color)] border-opacity-30 text-xs">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 4 15 12 5 20 5 4"></polygon><line x1="19" y1="5" x2="19" y2="19"></line></svg>
-                    Archive Day Manually
-                </button>
-            </div>
+        <div style={styles.streakBadge}>
+          <span style={{ color: '#f97316', fontSize: 14 }}>●</span>
+          <span style={styles.streakNum}>{streakScore}%</span>
+          <span style={styles.streakText}>today</span>
         </div>
-    </div>
+      </header>
 
-    <main class="px-6 pb-32 relative">
-        <!-- Daily View -->
-        <div id="view-today" class="page-container active space-y-8 pt-2">
-            <section id="section-tasks" class="space-y-4">
-                <div class="flex justify-between items-end mb-2 px-1">
-                    <h2 class="text-2xl">Tasks</h2>
-                </div>
-                <form id="form-task" class="flex gap-2 mb-4 relative">
-                    <input type="text" id="input-task" placeholder="Type a new task..." class="soft-input py-3 px-4 flex-1 text-sm" autocomplete="off" enterkeyhint="done">
-                    <button type="submit" class="absolute right-2 top-2 bottom-2 bg-[color:var(--accent-color)] text-black rounded px-3 flex items-center justify-center">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                    </button>
-                </form>
-                <div id="task-list" class="space-y-3"></div>
-            </section>
+      {/* ── Content ── */}
+      <main style={styles.main}>
 
-            <section id="section-habits" class="hidden space-y-4">
-                <div class="flex justify-between items-center mb-2 px-1">
-                    <h2 class="text-2xl">Habits</h2>
-                    <button onclick="openHabitManager()" class="text-[0.6rem] font-black uppercase tracking-widest opacity-40 hover:opacity-100 transition-opacity">Edit</button>
-                </div>
-                <div id="habit-list" class="space-y-3"></div>
-            </section>
-
-            <section id="section-notes" class="hidden space-y-4">
-                <div class="flex justify-between items-center mb-2 px-1 shrink-0">
-                    <h2 class="text-2xl text-[color:var(--accent-color)]">Reflections</h2>
-                </div>
-                <textarea id="textarea-notes" placeholder="Write your thoughts for today..." class="soft-input p-6 w-full shadow-sm min-h-[400px] resize-none border-none bg-[color:var(--surface-color)]" spellcheck="false"></textarea>
-            </section>
-        </div>
-
-        <!-- History List View -->
-        <div id="view-history" class="page-container pt-2">
-            <h2 class="text-2xl mb-6">Archives</h2>
-            <div id="history-list" class="space-y-3"></div>
-        </div>
-
-        <!-- Stats View -->
-        <div id="view-stats" class="page-container pt-2">
-            <h2 class="text-2xl mb-6">Insights</h2>
-            
-            <div class="grid grid-cols-2 gap-4 mb-6">
-                <div class="stat-badge">
-                    <span class="text-[0.6rem] uppercase font-bold opacity-40 mb-2 block tracking-widest">Lifetime</span>
-                    <span id="stat-total-habits" class="text-4xl editorial-font">0</span>
-                    <span class="text-[0.6rem] opacity-40 block mt-1">Actions</span>
-                </div>
-                <div class="stat-badge">
-                    <span class="text-[0.6rem] uppercase font-bold opacity-40 mb-2 block tracking-widest">Streak</span>
-                    <span id="stat-streak" class="text-4xl editorial-font text-[color:var(--accent-color)]">0</span>
-                    <span class="text-[0.6rem] opacity-40 block mt-1">Days</span>
-                </div>
+        {/* TASKS TAB */}
+        {tab === 'tasks' && (
+          <div className="fade-in" style={styles.section}>
+            <div style={styles.sectionHeader}>
+              <span style={styles.sectionTitle}>Tasks</span>
+              <span style={styles.sectionMeta}>{completedTodos}/{totalTodos} done</span>
             </div>
 
-            <div id="stats-habit-grids" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
-            
-            <div class="soft-card p-6 mt-6 mb-6">
-                <h3 class="text-[0.65rem] font-bold uppercase opacity-30 mb-3 tracking-widest">Most Active Day</h3>
-                <div id="stat-best-day-card" class="flex flex-col gap-1">
-                    <div id="stat-best-date" class="text-lg editorial-font">No records yet</div>
-                    <div id="stat-best-details" class="text-xs opacity-50">Consistency is the key to clarity.</div>
-                </div>
+            {/* Quick Add */}
+            <div style={styles.inputRow}>
+              <input
+                ref={todoInputRef}
+                style={styles.input}
+                placeholder="Add a task…"
+                value={newTodo}
+                onChange={e => setNewTodo(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && addTodo()}
+                className="pulse-input"
+              />
+              <button style={styles.addBtn} onClick={addTodo} className="icon-btn">
+                <Icons.plus />
+              </button>
             </div>
-        </div>
 
-        <!-- Detail View -->
-        <div id="view-history-detail" class="page-container pt-2">
-            <div class="flex items-center gap-4 mb-6">
-                <button onclick="switchView('history')" class="soft-btn p-2 rounded-full"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg></button>
-                <h2 id="history-detail-date" class="text-2xl"></h2>
-            </div>
-            <div class="soft-card p-6 space-y-6">
-                <div id="hist-missed-section">
-                    <h3 class="text-[0.65rem] font-bold uppercase text-[color:var(--muted-color)] mb-3 tracking-widest">Unfinished</h3>
-                    <ul id="hist-missed-list" class="space-y-2 text-sm opacity-80"></ul>
-                </div>
-                <div>
-                    <h3 class="text-[0.65rem] font-bold uppercase text-[color:var(--accent-color)] mb-3 tracking-widest">Completed</h3>
-                    <ul id="hist-completed-list" class="space-y-2 text-sm"></ul>
-                </div>
-                <div>
-                    <h3 class="text-[0.65rem] font-bold uppercase opacity-30 mb-3 tracking-widest">Habit Recap</h3>
-                    <ul id="hist-habits-list" class="space-y-2 text-sm"></ul>
-                </div>
-                <div id="hist-notes-section">
-                    <h3 class="text-[0.65rem] font-bold uppercase opacity-30 mb-3 tracking-widest">Reflections</h3>
-                    <div id="hist-notes-content" class="text-sm italic leading-relaxed whitespace-pre-wrap opacity-80 border-l border-[color:var(--border-color)] pl-5"></div>
-                </div>
-            </div>
-        </div>
-    </main>
-
-    <!-- Navigation -->
-    <nav id="bottom-tabs" class="bottom-nav">
-        <button onclick="switchTab('tasks')" class="nav-item active" id="tab-tasks">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
-            <span>TASKS</span>
-        </button>
-        <button onclick="switchTab('habits')" class="nav-item" id="tab-habits">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path></svg>
-            <span>HABITS</span>
-        </button>
-        <button onclick="switchTab('notes')" class="nav-item" id="tab-notes">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121(3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-            <span>NOTES</span>
-        </button>
-    </nav>
-
-    <!-- Modals -->
-    <div id="modal-manage-habits" class="fixed inset-0 modal-overlay z-50 flex flex-col justify-end hidden">
-        <div class="bg-[color:var(--surface-color)] rounded-t-3xl p-6 pb-12 shadow-2xl border-t border-[color:var(--border-color)] h-[60vh] flex flex-col transition-transform duration-300 transform translate-y-full" id="habit-content">
-            <div class="flex justify-between items-center mb-6">
-                <h2 class="text-2xl">Edit Habits</h2>
-                <button onclick="closeHabitManager()" class="p-2 bg-[color:var(--input-bg)] rounded-full text-[color:var(--muted-color)]"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
-            </div>
-            <form id="form-manage-habit" class="flex gap-2 mb-6 relative">
-                <input type="text" id="input-manage-habit" placeholder="Add a ritual..." class="soft-input py-3 px-4 flex-1 text-sm" autocomplete="off" enterkeyhint="done">
-                <button type="submit" class="bg-[color:var(--accent-color)] text-black rounded px-4 text-xs font-bold uppercase tracking-widest">Add</button>
-            </form>
-            <div id="manage-habit-list" class="flex-1 overflow-y-auto space-y-2"></div>
-        </div>
-    </div>
-
-    <script>
-        const STORAGE_KEY = 'editorial_journal_v1';
-        let state = { theme: 'dark', lastOpenedDate: '', tasks: [], habits: [], habitStatus: {}, notes: '', history: {} };
-        let currentTab = 'tasks';
-
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        
-        function playSoftSound(type = 'click') {
-            if (audioCtx.state === 'suspended') audioCtx.resume();
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            osc.connect(gain); gain.connect(audioCtx.destination);
-            const now = audioCtx.currentTime;
-            if (type === 'pop') {
-                osc.type = 'sine'; osc.frequency.setValueAtTime(300, now); osc.frequency.exponentialRampToValueAtTime(100, now + 0.1);
-                gain.gain.setValueAtTime(0.1, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
-                osc.start(now); osc.stop(now + 0.1);
-            } else if (type === 'tick') {
-                osc.type = 'sine'; osc.frequency.setValueAtTime(500, now); osc.frequency.exponentialRampToValueAtTime(800, now + 0.04);
-                gain.gain.setValueAtTime(0.04, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.04);
-                osc.start(now); osc.stop(now + 0.04);
-            } else {
-                osc.type = 'sine'; osc.frequency.setValueAtTime(120, now); gain.gain.setValueAtTime(0.08, now);
-                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
-                osc.start(now); osc.stop(now + 0.1);
-            }
-        }
-
-        function init() {
-            loadState();
-            applyTheme();
-            checkAndResetDay();
-            setupEvents();
-            updateHeaderDate();
-            renderToday();
-            switchTab('tasks');
-            document.getElementById('textarea-notes').value = state.notes || '';
-            setInterval(checkAndResetDay, 60000);
-        }
-
-        function loadState() {
-            const stored = localStorage.getItem(STORAGE_KEY);
-            if (stored) state = { ...state, ...JSON.parse(stored) };
-        }
-
-        function saveState() {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-        }
-
-        function getLocalDateString(dateObj = new Date()) {
-            return `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
-        }
-
-        function checkAndResetDay() {
-            const todayStr = getLocalDateString();
-            if (!state.lastOpenedDate) {
-                state.lastOpenedDate = todayStr;
-                saveState();
-                return;
-            }
-            if (state.lastOpenedDate !== todayStr) {
-                archiveDay();
-                state.lastOpenedDate = todayStr;
-                saveState();
-                updateHeaderDate();
-                renderToday();
-                document.getElementById('textarea-notes').value = '';
-            }
-        }
-
-        function archiveDay() {
-            const entry = {
-                completedTasks: state.tasks.filter(t => t.completed),
-                missedTasks: state.tasks.filter(t => !t.completed),
-                habits: state.habits.map(h => ({ 
-                    id: h.id, 
-                    text: h.text, 
-                    completed: state.habitStatus[h.id] || false 
-                })),
-                notes: state.notes || ''
-            };
-            const hasContent = entry.completedTasks.length > 0 || 
-                             entry.missedTasks.length > 0 || 
-                             entry.habits.length > 0 || 
-                             entry.notes.trim().length > 0;
-
-            if (hasContent) {
-                state.history[state.lastOpenedDate] = entry;
-            }
-            state.tasks = []; 
-            state.habitStatus = {}; 
-            state.notes = ''; 
-        }
-
-        function renderToday() {
-            const tList = document.getElementById('task-list');
-            tList.innerHTML = state.tasks.length ? '' : '<div class="text-center py-12 opacity-30 text-xs tracking-widest uppercase">Start your journal</div>';
-            state.tasks.forEach(t => {
-                const div = document.createElement('div');
-                div.className = 'soft-card p-4 flex items-center gap-4 border-none';
-                div.innerHTML = `
-                    <input type="checkbox" class="soft-checkbox" ${t.completed ? 'checked' : ''}>
-                    <span class="flex-1 font-medium text-sm ${t.completed ? 'strike-through opacity-40' : ''}">${t.text}</span>
-                    <button class="opacity-20 hover:opacity-100 p-1"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"></path></svg></button>
-                `;
-                div.querySelector('input').onclick = () => { 
-                    t.completed = !t.completed; 
-                    if(t.completed) playSoftSound('pop'); else playSoftSound('tick');
-                    saveState(); renderToday(); 
-                };
-                div.querySelector('button').onclick = () => { 
-                    playSoftSound('tick');
-                    state.tasks = state.tasks.filter(x => x.id !== t.id); 
-                    saveState(); renderToday(); 
-                };
-                tList.appendChild(div);
-            });
-
-            const hList = document.getElementById('habit-list');
-            hList.innerHTML = state.habits.length ? '' : '<div class="text-center py-12 opacity-30 text-xs tracking-widest uppercase">Define your rituals</div>';
-            state.habits.forEach(h => {
-                const checked = state.habitStatus[h.id];
-                const div = document.createElement('div');
-                div.className = 'soft-card p-4 flex items-center gap-4 border-none';
-                div.innerHTML = `
-                    <input type="checkbox" class="soft-checkbox habit-check" ${checked ? 'checked' : ''}>
-                    <span class="flex-1 font-medium text-sm ${checked ? 'opacity-40' : ''}">${h.text}</span>
-                `;
-                div.querySelector('input').onclick = () => { 
-                    state.habitStatus[h.id] = !checked; 
-                    if(!checked) playSoftSound('pop'); else playSoftSound('tick');
-                    saveState(); renderToday(); 
-                };
-                hList.appendChild(div);
-            });
-        }
-
-        function calculateStats() {
-            let totalHabitsDone = 0;
-            let bestDay = null;
-            let maxCompleted = -1;
-            const dates = Object.keys(state.history).sort((a,b) => new Date(a) - new Date(b));
-            dates.forEach(date => {
-                const entry = state.history[date];
-                const habitsDone = entry.habits.filter(h => h.completed).length;
-                totalHabitsDone += habitsDone;
-                const completedCount = entry.completedTasks.length + habitsDone;
-                if (completedCount >= maxCompleted) {
-                    maxCompleted = completedCount;
-                    bestDay = { date, count: completedCount, habits: habitsDone, tasks: entry.completedTasks.length };
-                }
-            });
-            let streak = 0;
-            const todayStr = getLocalDateString();
-            let checkDate = new Date();
-            while (true) {
-                const dateStr = getLocalDateString(checkDate);
-                const isToday = dateStr === todayStr;
-                const entry = state.history[dateStr];
-                const hasActivityToday = isToday && (state.tasks.some(t => t.completed) || Object.values(state.habitStatus).some(v => v));
-                
-                if (entry || hasActivityToday) {
-                    streak++;
-                    checkDate.setDate(checkDate.getDate() - 1);
-                } else { break; }
-            }
-            document.getElementById('stat-total-habits').textContent = totalHabitsDone;
-            document.getElementById('stat-streak').textContent = streak;
-            if (bestDay) {
-                document.getElementById('stat-best-date').textContent = formatDateStr(bestDay.date);
-                document.getElementById('stat-best-details').textContent = `${bestDay.tasks} tasks & ${bestDay.habits} habits.`;
-            }
-            renderHabitStats();
-        }
-
-        function renderHabitStats() {
-            const container = document.getElementById('stats-habit-grids');
-            container.innerHTML = '';
-            if (state.habits.length === 0) {
-                container.innerHTML = '<div class="col-span-full text-center py-10 opacity-30 text-xs tracking-widest">NO DATA TO SHOW</div>';
-                return;
-            }
-            
-            const now = new Date();
-            const year = now.getFullYear();
-            const month = now.getMonth();
-            const daysInMonth = new Date(year, month + 1, 0).getDate();
-            const monthName = now.toLocaleString('default', { month: 'short' }).toUpperCase();
-            const todayStr = getLocalDateString();
-
-            state.habits.forEach(habit => {
-                const card = document.createElement('div');
-                card.className = 'stat-habit-card flex flex-col items-center border-none shadow-md';
-                let completedThisMonth = 0;
-                let cellsHtml = '';
-
-                for (let i = 1; i <= daysInMonth; i++) {
-                    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
-                    const isToday = dateStr === todayStr;
-                    let isCompleted = false;
-
-                    if (isToday) {
-                        isCompleted = state.habitStatus[habit.id] || false;
-                    } else if (state.history[dateStr]) {
-                        const histHabit = state.history[dateStr].habits.find(h => h.id === habit.id);
-                        isCompleted = histHabit ? histHabit.completed : false;
-                    }
-
-                    if (isCompleted) completedThisMonth++;
-                    cellsHtml += `<div class="heatmap-cell ${isCompleted ? 'completed' : ''}" title="${dateStr}"></div>`;
-                }
-
-                card.innerHTML = `
-                    <div class="flex justify-between items-center w-full mb-3">
-                        <h4 class="font-bold text-[0.7rem] truncate mr-2 tracking-tight">${habit.text}</h4>
-                        <div class="text-[0.5rem] font-black opacity-30 tracking-widest shrink-0">
-                            ${completedThisMonth}D
-                        </div>
+            {/* Todo list */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {state.todos.length === 0 && (
+                <div style={styles.empty}>No tasks. Enjoy the clarity ✦</div>
+              )}
+              {state.todos.map(todo => (
+                <div
+                  key={todo.id}
+                  style={{ ...styles.todoItem, opacity: todo.completed ? 0.55 : 1 }}
+                  className="todo-item"
+                >
+                  <div style={styles.todoLeft} onClick={() => toggleTodo(todo.id)}>
+                    <div style={{ ...styles.checkbox, ...(todo.completed ? styles.checkboxDone : {}) }}>
+                      {todo.completed && <Icons.check />}
                     </div>
-                    <div class="habit-heatmap-grid mb-2">${cellsHtml}</div>
-                    <div class="w-full text-left text-[0.5rem] opacity-20 tracking-tighter">${monthName} ${year}</div>
-                `;
-                container.appendChild(card);
-            });
-        }
+                    <span style={{ ...styles.todoText, ...(todo.completed ? styles.todoTextDone : {}) }}>
+                      {todo.text}
+                    </span>
+                  </div>
+                  <button
+                    style={styles.trashBtn}
+                    onClick={e => deleteTodo(todo.id, e)}
+                    className="trash-btn"
+                  >
+                    <Icons.trash />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
-        function renderHeatmap() {
-            const container = document.getElementById('nav-heatmap');
-            container.innerHTML = '';
-            const daysToShow = 75; 
-            const today = new Date();
-            for (let i = daysToShow - 1; i >= 0; i--) {
-                const d = new Date();
-                d.setDate(today.getDate() - i);
-                const dateStr = getLocalDateString(d);
-                const cell = document.createElement('div');
-                cell.className = 'heatmap-cell';
-                const histEntry = state.history[dateStr];
-                const isToday = dateStr === getLocalDateString();
-                let completionCount = 0;
-                if (histEntry) {
-                    completionCount = histEntry.habits.filter(h => h.completed).length + histEntry.completedTasks.length;
-                } else if (isToday) {
-                    completionCount = Object.values(state.habitStatus).filter(v => v).length + state.tasks.filter(t => t.completed).length;
-                }
-                if (completionCount > 0) {
-                    if (completionCount >= 5) cell.setAttribute('data-level', '3');
-                    else if (completionCount >= 3) cell.setAttribute('data-level', '2');
-                    else cell.setAttribute('data-level', '1');
-                }
-                cell.title = `${formatDateStr(dateStr)}: ${completionCount} items`;
-                container.appendChild(cell);
-            }
-        }
+        {/* HABITS TAB */}
+        {tab === 'habits' && (
+          <div className="fade-in" style={styles.section}>
+            <div style={styles.sectionHeader}>
+              <span style={styles.sectionTitle}>Habits</span>
+              <button style={styles.addHabitBtn} onClick={() => setShowHabitModal(true)} className="icon-btn">
+                <Icons.plus />
+              </button>
+            </div>
 
-        function switchView(viewId) {
-            playSoftSound('click');
-            document.querySelectorAll('.page-container').forEach(el => el.classList.remove('active'));
-            const header = document.getElementById('header-date');
-            const bottomNav = document.getElementById('bottom-tabs');
-            if (viewId === 'today') {
-                header.textContent = formatDateStr(state.lastOpenedDate);
-                document.getElementById('view-today').classList.add('active');
-                bottomNav.classList.remove('hidden');
-            } else if (viewId === 'history') {
-                header.textContent = 'Archives';
-                renderHistoryList();
-                document.getElementById('view-history').classList.add('active');
-                bottomNav.classList.add('hidden');
-            } else if (viewId === 'stats') {
-                header.textContent = 'Insights';
-                calculateStats();
-                document.getElementById('view-stats').classList.add('active');
-                bottomNav.classList.add('hidden');
-            } else if (viewId === 'history-detail') {
-                document.getElementById('view-history-detail').classList.add('active');
-                bottomNav.classList.add('hidden');
-            }
-            closeNav();
-            window.scrollTo(0, 0);
-        }
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {state.habits.length === 0 && (
+                <div style={styles.empty}>No habits yet. Tap + to start one.</div>
+              )}
+              {state.habits.map(habit => {
+                const done = !!(todayLogs[habit.id]);
+                const streak = getStreak(habit.id);
+                return (
+                  <div
+                    key={habit.id}
+                    style={{ ...styles.habitItem, ...(done ? styles.habitDone : {}) }}
+                    className="habit-item"
+                    onClick={() => toggleHabit(habit.id)}
+                  >
+                    <div style={styles.habitLeft}>
+                      <div style={{ ...styles.habitCheck, ...(done ? styles.habitCheckDone : {}) }}>
+                        {done && <Icons.check />}
+                      </div>
+                      <div>
+                        <div style={styles.habitName}>{habit.name}</div>
+                        {streak > 0 && (
+                          <div style={styles.habitStreak}>
+                            <span style={{ color: '#f97316' }}>🔥</span> {streak} day streak
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <button
+                      style={styles.trashBtn}
+                      onClick={e => { e.stopPropagation(); deleteHabit(habit.id); }}
+                      className="trash-btn"
+                    >
+                      <Icons.trash />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
-        function switchTab(tabId) {
-            playSoftSound('tick');
-            currentTab = tabId;
-            document.getElementById('section-tasks').classList.toggle('hidden', tabId !== 'tasks');
-            document.getElementById('section-habits').classList.toggle('hidden', tabId !== 'habits');
-            document.getElementById('section-notes').classList.toggle('hidden', tabId !== 'notes');
-            document.getElementById('tab-tasks').classList.toggle('active', tabId === 'tasks');
-            document.getElementById('tab-habits').classList.toggle('active', tabId === 'habits');
-            document.getElementById('tab-notes').classList.toggle('active', tabId === 'notes');
-            window.scrollTo(0, 0);
-        }
+        {/* STATS TAB */}
+        {tab === 'stats' && (
+          <div className="fade-in" style={styles.section}>
+            <div style={styles.sectionHeader}>
+              <span style={styles.sectionTitle}>Insights</span>
+              <div style={styles.toggleGroup}>
+                <button
+                  style={{ ...styles.toggleBtn, ...(statsView === 'heatmap' ? styles.toggleActive : {}) }}
+                  onClick={() => setStatsView('heatmap')}
+                >Heatmap</button>
+                <button
+                  style={{ ...styles.toggleBtn, ...(statsView === 'archive' ? styles.toggleActive : {}) }}
+                  onClick={() => setStatsView('archive')}
+                >Archive</button>
+              </div>
+            </div>
 
-        function renderHistoryList() {
-            const list = document.getElementById('history-list');
-            list.innerHTML = '';
-            const dates = Object.keys(state.history).sort((a,b) => new Date(b) - new Date(a));
-            if (!dates.length) {
-                list.innerHTML = '<div class="text-center py-20 opacity-20 text-xs uppercase tracking-widest">No entries found</div>';
-                return;
-            }
-            dates.forEach(d => {
-                const div = document.createElement('button');
-                div.className = 'w-full soft-card p-4 text-left flex justify-between items-center text-sm border-none shadow-sm';
-                div.innerHTML = `<span class="font-medium">${formatDateStr(d)}</span> <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>`;
-                div.onclick = () => { playSoftSound('click'); renderHistoryDetail(d); };
-                list.appendChild(div);
-            });
-        }
+            {/* Summary cards */}
+            <div style={styles.summaryRow}>
+              <div style={styles.summaryCard}>
+                <div style={styles.summaryNum}>{totalHabits}</div>
+                <div style={styles.summaryLabel}>Habits</div>
+              </div>
+              <div style={styles.summaryCard}>
+                <div style={{ ...styles.summaryNum, color: '#10b981' }}>{completedHabits}</div>
+                <div style={styles.summaryLabel}>Done Today</div>
+              </div>
+              <div style={styles.summaryCard}>
+                <div style={{ ...styles.summaryNum, color: '#f97316' }}>{streakScore}%</div>
+                <div style={styles.summaryLabel}>Score</div>
+              </div>
+            </div>
 
-        function renderHistoryDetail(date) {
-            const data = state.history[date];
-            document.getElementById('history-detail-date').textContent = formatDateStr(date);
-            const mList = document.getElementById('hist-missed-list');
-            mList.innerHTML = data.missedTasks.length ? '' : 'No pending tasks.';
-            data.missedTasks.forEach(t => mList.innerHTML += `<li>— ${t.text}</li>`);
-            const cList = document.getElementById('hist-completed-list');
-            cList.innerHTML = '';
-            data.completedTasks.forEach(t => cList.innerHTML += `<li>— ${t.text}</li>`);
-            const hList = document.getElementById('hist-habits-list');
-            hList.innerHTML = '';
-            data.habits.forEach(h => hList.innerHTML += `<li class="${h.completed ? 'opacity-100 font-bold' : 'opacity-20'}">${h.completed ? '●' : '○'} ${h.text}</li>`);
-            const nContent = document.getElementById('hist-notes-content');
-            const nSection = document.getElementById('hist-notes-section');
-            if (data.notes && data.notes.trim()) {
-                nSection.classList.remove('hidden'); nContent.textContent = data.notes;
-            } else { nSection.classList.add('hidden'); }
-            switchView('history-detail');
-        }
+            {/* Heatmap view */}
+            {statsView === 'heatmap' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                {/* Month navigator — shared across all habits */}
+                <div style={styles.monthNav}>
+                  <button style={styles.monthNavBtn} onClick={prevMonth} className="icon-btn">‹</button>
+                  <span style={styles.monthNavLabel}>
+                    {new Date(heatmapMonth.year, heatmapMonth.month).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                  </span>
+                  <button style={{ ...styles.monthNavBtn, opacity: isCurrentMonth() ? 0.25 : 1, cursor: isCurrentMonth() ? 'default' : 'pointer' }} onClick={nextMonth} className="icon-btn">›</button>
+                </div>
 
-        function formatDateStr(s) {
-            if (!s) return '';
-            const parts = s.split('-');
-            const d = new Date(parts[0], parts[1]-1, parts[2]);
-            return d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-        }
+                {state.habits.length === 0 && (
+                  <div style={styles.empty}>Add habits to see your monthly calendar.</div>
+                )}
 
-        function setupEvents() {
-            document.getElementById('form-task').onsubmit = (e) => {
-                e.preventDefault();
-                const val = document.getElementById('input-task').value.trim();
-                if (val) { 
-                    playSoftSound('pop');
-                    state.tasks.push({ id: Date.now(), text: val, completed: false }); 
-                    saveState(); renderToday(); 
-                }
-                document.getElementById('input-task').value = '';
-            };
-            document.getElementById('form-manage-habit').onsubmit = (e) => {
-                e.preventDefault();
-                const val = document.getElementById('input-manage-habit').value.trim();
-                if (val) { 
-                    playSoftSound('pop');
-                    state.habits.push({ id: Date.now(), text: val }); 
-                    saveState(); renderHabitManager(); renderToday(); 
-                }
-                document.getElementById('input-manage-habit').value = '';
-            };
-            document.getElementById('textarea-notes').oninput = (e) => { state.notes = e.target.value; saveState(); };
-            document.getElementById('btn-nav').onclick = () => {
-                playSoftSound('click');
-                renderHeatmap(); 
-                const nav = document.getElementById('nav-menu');
-                nav.classList.remove('hidden'); nav.classList.add('flex');
-                setTimeout(() => document.getElementById('nav-content').classList.remove('translate-y-full'), 10);
-            };
-            document.getElementById('btn-close-nav').onclick = () => { playSoftSound('tick'); closeNav(); };
-            document.getElementById('btn-theme').onclick = () => { 
-                playSoftSound('tick');
-                state.theme = state.theme === 'dark' ? 'light' : 'dark'; 
-                applyTheme(); saveState(); 
-            };
-            document.getElementById('btn-debug-skip').onclick = () => {
-                playSoftSound('pop'); archiveDay();
-                const parts = state.lastOpenedDate.split('-');
-                const d = new Date(parts[0], parts[1]-1, parts[2]);
-                d.setDate(d.getDate() + 1);
-                state.lastOpenedDate = getLocalDateString(d);
-                saveState(); updateHeaderDate(); renderToday();
-                document.getElementById('textarea-notes').value = '';
-                closeNav(); switchView('today');
-            };
-        }
+                {state.habits.map(habit => {
+                  const cells = getMonthHeatmap(habit.id);
+                  const streak = getStreak(habit.id);
+                  const doneCount = cells.filter(c => c && c.done).length;
+                  const totalDays = cells.filter(c => c && !c.isFuture).length;
+                  const pct = totalDays > 0 ? Math.round((doneCount / totalDays) * 100) : 0;
+                  return (
+                    <div key={habit.id} style={styles.heatmapCard}>
+                      {/* Habit name + stats */}
+                      <div style={styles.heatmapHeader}>
+                        <span style={styles.heatmapName}>{habit.name}</span>
+                        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                          {streak > 0 && <span style={{ fontSize: 11, color: '#f97316' }}>🔥 {streak} streak</span>}
+                          <span style={{ fontSize: 11, color: '#10b981', fontWeight: 700 }}>{pct}%</span>
+                        </div>
+                      </div>
 
-        function closeNav() {
-            document.getElementById('nav-content').classList.add('translate-y-full');
-            setTimeout(() => document.getElementById('nav-menu').classList.add('hidden'), 300);
-        }
+                      {/* Progress bar */}
+                      <div style={styles.progressBarTrack}>
+                        <div style={{ ...styles.progressBarFill, width: `${pct}%` }} />
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4, marginBottom: 14 }}>
+                        <span style={{ fontSize: 10, color: '#4b5563' }}>{doneCount} of {totalDays} days completed</span>
+                        <span style={{ fontSize: 10, color: '#374151' }}>{cells.filter(c => c && !c.done && !c.isFuture).length} missed</span>
+                      </div>
 
-        function openHabitManager() {
-            playSoftSound('click'); renderHabitManager();
-            document.getElementById('modal-manage-habits').classList.remove('hidden');
-            setTimeout(() => document.getElementById('habit-content').classList.remove('translate-y-full'), 10);
-        }
+                      {/* Day-of-week headers */}
+                      <div style={styles.calGrid}>
+                        {['M','T','W','T','F','S','S'].map((d, i) => (
+                          <div key={i} style={styles.calDayHeader}>{d}</div>
+                        ))}
+                        {cells.map((cell, i) => {
+                          if (!cell) return <div key={`e-${i}`} />;
+                          let bg = 'rgba(255,255,255,0.04)';
+                          let color = '#374151';
+                          let border = '1px solid transparent';
+                          if (cell.isFuture) { bg = 'transparent'; color = '#1f2937'; }
+                          else if (cell.done) { bg = '#10b981'; color = '#fff'; }
+                          else { bg = 'rgba(239,68,68,0.12)'; color = '#6b7280'; border = '1px solid rgba(239,68,68,0.15)'; }
+                          if (cell.isToday) border = '2px solid #10b981';
+                          return (
+                            <div
+                              key={cell.dateStr}
+                              title={cell.done ? `${cell.day} — Done ✓` : cell.isFuture ? `${cell.day}` : `${cell.day} — Missed`}
+                              style={{
+                                ...styles.calCell,
+                                background: bg,
+                                color,
+                                border,
+                                fontWeight: cell.isToday ? 700 : 400,
+                              }}
+                            >
+                              {cell.day}
+                              {cell.done && !cell.isFuture && <div style={styles.calDot} />}
+                            </div>
+                          );
+                        })}
+                      </div>
 
-        function closeHabitManager() {
-            playSoftSound('tick');
-            document.getElementById('habit-content').classList.add('translate-y-full');
-            setTimeout(() => document.getElementById('modal-manage-habits').classList.add('hidden'), 300);
-        }
+                      {/* Legend */}
+                      <div style={styles.calLegend}>
+                        <div style={styles.calLegendItem}>
+                          <div style={{ ...styles.calLegendDot, background: '#10b981' }} />
+                          <span>Done</span>
+                        </div>
+                        <div style={styles.calLegendItem}>
+                          <div style={{ ...styles.calLegendDot, background: 'rgba(239,68,68,0.25)', border: '1px solid rgba(239,68,68,0.3)' }} />
+                          <span>Missed</span>
+                        </div>
+                        <div style={styles.calLegendItem}>
+                          <div style={{ ...styles.calLegendDot, background: 'transparent', border: '1px solid rgba(255,255,255,0.05)' }} />
+                          <span>Upcoming</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
 
-        function renderHabitManager() {
-            const list = document.getElementById('manage-habit-list');
-            list.innerHTML = '';
-            state.habits.forEach(h => {
-                const div = document.createElement('div');
-                div.className = 'soft-input p-3 flex justify-between items-center text-sm font-medium';
-                div.innerHTML = `<span>${h.text}</span> <button class="text-[color:var(--accent-color)] opacity-60 font-bold p-1 uppercase text-[0.6rem] tracking-widest">Delete</button>`;
-                div.querySelector('button').onclick = () => { 
-                    playSoftSound('tick');
-                    state.habits = state.habits.filter(x => x.id !== h.id); 
-                    saveState(); renderHabitManager(); renderToday(); 
-                };
-                list.appendChild(div);
-            });
-        }
+            {/* Archive view */}
+            {statsView === 'archive' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <div style={styles.archiveSearch}>
+                  <input
+                    type="date"
+                    style={styles.dateInput}
+                    value={archiveDateQuery}
+                    onChange={e => setArchiveDateQuery(e.target.value)}
+                    className="pulse-input"
+                  />
+                  <button style={styles.searchBtn} onClick={lookupArchive} className="icon-btn">
+                    <Icons.search />
+                  </button>
+                </div>
 
-        function applyTheme() {
-            document.body.className = state.theme === 'dark' ? 'theme-dark' : 'theme-light';
-            document.getElementById('icon-sun').classList.toggle('hidden', state.theme !== 'dark');
-            document.getElementById('icon-moon').classList.toggle('hidden', state.theme === 'dark');
-        }
+                {archiveDateQuery && archiveResult === null && (
+                  <div style={styles.empty}>No data found for {archiveDateQuery}.</div>
+                )}
+                {archiveResult && (
+                  <div style={styles.archiveResult}>
+                    <div style={styles.archiveResultDate}>{archiveDateQuery}</div>
+                    <div style={styles.archiveSection}>
+                      <div style={{ ...styles.archiveSectionTitle, color: '#10b981' }}>Habits</div>
+                      {archiveResult.habits.length === 0 && <div style={styles.archiveEmpty}>No habits that day.</div>}
+                      {archiveResult.habits.map(h => (
+                        <div key={h.id} style={styles.archiveRow}>
+                          <span>{h.name}</span>
+                          <span style={{ color: h.completed ? '#10b981' : '#ef4444', fontWeight: 700 }}>
+                            {h.completed ? '✓' : '✗'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                    <div style={styles.archiveSection}>
+                      <div style={{ ...styles.archiveSectionTitle, color: '#a78bfa' }}>Tasks</div>
+                      {archiveResult.todos.length === 0 && <div style={styles.archiveEmpty}>No tasks that day.</div>}
+                      {archiveResult.todos.map(t => (
+                        <div key={t.id} style={styles.archiveRow}>
+                          <span style={{ textDecoration: t.completed ? 'line-through' : 'none', color: t.completed ? '#6b7280' : '#e5e7eb' }}>{t.text}</span>
+                          <span style={{ color: t.completed ? '#10b981' : '#6b7280', fontSize: 10, fontWeight: 700 }}>
+                            {t.completed ? 'DONE' : 'OPEN'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
-        function updateHeaderDate() { document.getElementById('header-date').textContent = formatDateStr(state.lastOpenedDate); }
+                {/* Available archive dates */}
+                <div>
+                  <div style={styles.archiveDatesTitle}>Archived Days</div>
+                  {Object.keys(state.archive).length === 0 && (
+                    <div style={styles.empty}>Archive builds automatically at midnight each day.</div>
+                  )}
+                  {Object.keys(state.archive).sort().reverse().map(date => (
+                    <div
+                      key={date}
+                      style={styles.archiveDateRow}
+                      className="todo-item"
+                      onClick={() => { setArchiveDateQuery(date); setArchiveResult(state.archive[date]); }}
+                    >
+                      <span style={{ color: '#e5e7eb', fontSize: 14 }}>{date}</span>
+                      <span style={{ color: '#4b5563', fontSize: 12 }}>
+                        {state.archive[date]?.habits?.filter(h => h.completed).length || 0}/{state.archive[date]?.habits?.length || 0} habits ·{' '}
+                        {state.archive[date]?.todos?.filter(t => t.completed).length || 0}/{state.archive[date]?.todos?.length || 0} tasks
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </main>
 
-        window.onload = init;
-    </script>
-</body>
-</html>
+      {/* ── Bottom Nav ── */}
+      <nav style={styles.nav}>
+        {[
+          { id: 'tasks', icon: Icons.tasks, label: 'Tasks' },
+          { id: 'habits', icon: Icons.habits, label: 'Habits' },
+          { id: 'stats', icon: Icons.stats, label: 'Insights' },
+        ].map(({ id, icon: Ico, label }) => (
+          <button
+            key={id}
+            style={{ ...styles.navBtn, ...(tab === id ? styles.navBtnActive : {}) }}
+            onClick={() => setTab(id)}
+            className="nav-btn"
+          >
+            <Ico />
+            <span style={styles.navLabel}>{label}</span>
+            {tab === id && <div style={styles.navIndicator} />}
+          </button>
+        ))}
+      </nav>
+
+      {/* ── Add Habit Modal ── */}
+      {showHabitModal && (
+        <div style={styles.overlay} onClick={() => setShowHabitModal(false)}>
+          <div style={styles.modal} onClick={e => e.stopPropagation()} className="modal-in">
+            <div style={styles.modalHandle} />
+            <div style={styles.modalTitle}>New Habit</div>
+            <div style={styles.modalSub}>Track it daily and watch the streak grow.</div>
+            <input
+              ref={habitInputRef}
+              style={{ ...styles.input, marginBottom: 14 }}
+              placeholder="e.g. Meditate 10 min"
+              value={newHabit}
+              onChange={e => setNewHabit(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && addHabit()}
+              className="pulse-input"
+            />
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button style={styles.modalCreateBtn} onClick={addHabit} className="icon-btn">Create Habit</button>
+              <button style={styles.modalCancelBtn} onClick={() => setShowHabitModal(false)} className="icon-btn">
+                <Icons.close />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Styles ───────────────────────────────────────────────────────────────────
+const styles = {
+  root: {
+    minHeight: '100dvh',
+    background: '#080808',
+    color: '#f1f5f9',
+    fontFamily: "'DM Mono', 'JetBrains Mono', 'Fira Code', monospace",
+    display: 'flex',
+    flexDirection: 'column',
+    maxWidth: 420,
+    margin: '0 auto',
+    position: 'relative',
+  },
+  header: {
+    padding: '32px 24px 16px',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    borderBottom: '1px solid rgba(255,255,255,0.05)',
+  },
+  appName: {
+    fontSize: 28,
+    fontWeight: 700,
+    letterSpacing: '0.2em',
+    background: 'linear-gradient(135deg, #f1f5f9 0%, #94a3b8 100%)',
+    WebkitBackgroundClip: 'text',
+    WebkitTextFillColor: 'transparent',
+  },
+  dateLabel: {
+    fontSize: 11,
+    color: '#4b5563',
+    letterSpacing: '0.05em',
+    marginTop: 4,
+    textTransform: 'uppercase',
+  },
+  streakBadge: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'flex-end',
+    gap: 2,
+  },
+  streakNum: { fontSize: 22, fontWeight: 700, color: '#f97316', lineHeight: 1 },
+  streakText: { fontSize: 10, color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.1em' },
+  main: {
+    flex: 1,
+    overflowY: 'auto',
+    padding: '20px 20px 100px',
+  },
+  section: { display: 'flex', flexDirection: 'column', gap: 16 },
+  sectionHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  sectionTitle: {
+    fontSize: 13,
+    fontWeight: 700,
+    letterSpacing: '0.15em',
+    textTransform: 'uppercase',
+    color: '#6b7280',
+  },
+  sectionMeta: { fontSize: 11, color: '#374151' },
+  inputRow: {
+    display: 'flex',
+    gap: 8,
+  },
+  input: {
+    flex: 1,
+    background: 'rgba(255,255,255,0.04)',
+    border: '1px solid rgba(255,255,255,0.08)',
+    borderRadius: 14,
+    padding: '13px 16px',
+    color: '#f1f5f9',
+    fontSize: 14,
+    outline: 'none',
+    fontFamily: 'inherit',
+    transition: 'border-color 0.2s',
+  },
+  addBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    background: '#1d4ed8',
+    border: 'none',
+    color: '#fff',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  todoItem: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: '12px 14px',
+    background: 'rgba(255,255,255,0.03)',
+    border: '1px solid rgba(255,255,255,0.06)',
+    borderRadius: 14,
+    cursor: 'pointer',
+    transition: 'all 0.15s',
+  },
+  todoLeft: { display: 'flex', alignItems: 'center', gap: 12, flex: 1 },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 6,
+    border: '2px solid rgba(255,255,255,0.15)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+    transition: 'all 0.2s',
+  },
+  checkboxDone: {
+    background: '#7c3aed',
+    borderColor: '#7c3aed',
+  },
+  todoText: { fontSize: 14, color: '#e2e8f0' },
+  todoTextDone: { textDecoration: 'line-through', color: '#374151' },
+  trashBtn: {
+    background: 'none',
+    border: 'none',
+    color: '#374151',
+    cursor: 'pointer',
+    padding: 6,
+    borderRadius: 8,
+    display: 'flex',
+    transition: 'color 0.15s',
+  },
+  empty: {
+    textAlign: 'center',
+    color: '#374151',
+    fontSize: 13,
+    padding: '40px 0',
+    letterSpacing: '0.02em',
+  },
+  habitItem: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: '14px 16px',
+    background: 'rgba(255,255,255,0.03)',
+    border: '1px solid rgba(255,255,255,0.06)',
+    borderRadius: 16,
+    cursor: 'pointer',
+    transition: 'all 0.2s',
+  },
+  habitDone: {
+    background: 'rgba(16,185,129,0.07)',
+    border: '1px solid rgba(16,185,129,0.2)',
+  },
+  habitLeft: { display: 'flex', alignItems: 'center', gap: 12 },
+  habitCheck: {
+    width: 24,
+    height: 24,
+    borderRadius: 8,
+    border: '2px solid rgba(255,255,255,0.12)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+    transition: 'all 0.2s',
+  },
+  habitCheckDone: {
+    background: '#10b981',
+    borderColor: '#10b981',
+    boxShadow: '0 0 10px rgba(16,185,129,0.4)',
+  },
+  habitName: { fontSize: 14, color: '#e2e8f0', fontWeight: 500 },
+  habitStreak: { fontSize: 11, color: '#6b7280', marginTop: 2 },
+  addHabitBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    background: 'rgba(255,255,255,0.05)',
+    border: '1px solid rgba(255,255,255,0.08)',
+    color: '#94a3b8',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  toggleGroup: { display: 'flex', gap: 4, background: 'rgba(255,255,255,0.04)', borderRadius: 10, padding: 3 },
+  toggleBtn: {
+    padding: '5px 12px',
+    borderRadius: 8,
+    border: 'none',
+    background: 'none',
+    color: '#6b7280',
+    fontSize: 11,
+    fontFamily: 'inherit',
+    fontWeight: 600,
+    cursor: 'pointer',
+    letterSpacing: '0.05em',
+    transition: 'all 0.15s',
+  },
+  toggleActive: { background: 'rgba(255,255,255,0.09)', color: '#f1f5f9' },
+  summaryRow: { display: 'flex', gap: 10 },
+  summaryCard: {
+    flex: 1,
+    background: 'rgba(255,255,255,0.03)',
+    border: '1px solid rgba(255,255,255,0.06)',
+    borderRadius: 14,
+    padding: '14px 12px',
+    textAlign: 'center',
+  },
+  summaryNum: { fontSize: 24, fontWeight: 700, color: '#f1f5f9' },
+  summaryLabel: { fontSize: 10, color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: 2 },
+  monthNav: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    background: 'rgba(255,255,255,0.03)',
+    border: '1px solid rgba(255,255,255,0.06)',
+    borderRadius: 14,
+    padding: '10px 14px',
+  },
+  monthNavBtn: {
+    background: 'none',
+    border: 'none',
+    color: '#94a3b8',
+    fontSize: 22,
+    cursor: 'pointer',
+    lineHeight: 1,
+    padding: '0 4px',
+    fontFamily: 'inherit',
+  },
+  monthNavLabel: { fontSize: 13, fontWeight: 700, color: '#e2e8f0', letterSpacing: '0.04em' },
+  heatmapCard: {
+    background: 'rgba(255,255,255,0.02)',
+    border: '1px solid rgba(255,255,255,0.06)',
+    borderRadius: 18,
+    padding: '18px 16px 14px',
+  },
+  heatmapHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  heatmapName: { fontSize: 14, fontWeight: 700, letterSpacing: '0.03em', color: '#e2e8f0' },
+  progressBarTrack: {
+    height: 4,
+    background: 'rgba(255,255,255,0.06)',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    background: 'linear-gradient(90deg, #059669, #10b981)',
+    borderRadius: 4,
+    transition: 'width 0.5s ease',
+  },
+  calGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(7, 1fr)',
+    gap: 5,
+  },
+  calDayHeader: {
+    fontSize: 9,
+    fontWeight: 700,
+    color: '#374151',
+    textAlign: 'center',
+    paddingBottom: 6,
+    letterSpacing: '0.05em',
+    textTransform: 'uppercase',
+  },
+  calCell: {
+    aspectRatio: '1',
+    borderRadius: 8,
+    fontSize: 11,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+    transition: 'all 0.15s',
+    cursor: 'default',
+    gap: 2,
+  },
+  calDot: {
+    width: 3,
+    height: 3,
+    borderRadius: '50%',
+    background: 'rgba(255,255,255,0.6)',
+  },
+  calLegend: {
+    display: 'flex',
+    gap: 14,
+    marginTop: 12,
+    justifyContent: 'center',
+  },
+  calLegendItem: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 5,
+    fontSize: 10,
+    color: '#4b5563',
+  },
+  calLegendDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 3,
+  },
+  archiveSearch: { display: 'flex', gap: 8 },
+  dateInput: {
+    flex: 1,
+    background: 'rgba(255,255,255,0.04)',
+    border: '1px solid rgba(255,255,255,0.08)',
+    borderRadius: 12,
+    padding: '10px 14px',
+    color: '#f1f5f9',
+    fontSize: 13,
+    outline: 'none',
+    fontFamily: 'inherit',
+    colorScheme: 'dark',
+  },
+  searchBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    background: 'rgba(255,255,255,0.06)',
+    border: '1px solid rgba(255,255,255,0.08)',
+    color: '#94a3b8',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  archiveResult: {
+    background: 'rgba(255,255,255,0.02)',
+    border: '1px solid rgba(255,255,255,0.07)',
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  archiveResultDate: {
+    padding: '12px 16px',
+    fontSize: 12,
+    fontWeight: 700,
+    letterSpacing: '0.1em',
+    color: '#6b7280',
+    borderBottom: '1px solid rgba(255,255,255,0.05)',
+    textTransform: 'uppercase',
+  },
+  archiveSection: {
+    padding: '12px 16px',
+    borderBottom: '1px solid rgba(255,255,255,0.05)',
+  },
+  archiveSectionTitle: {
+    fontSize: 10,
+    fontWeight: 700,
+    letterSpacing: '0.1em',
+    textTransform: 'uppercase',
+    marginBottom: 8,
+  },
+  archiveRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '6px 0',
+    borderBottom: '1px solid rgba(255,255,255,0.03)',
+    fontSize: 13,
+    color: '#9ca3af',
+  },
+  archiveEmpty: { fontSize: 12, color: '#374151', fontStyle: 'italic' },
+  archiveDatesTitle: {
+    fontSize: 10,
+    color: '#374151',
+    fontWeight: 700,
+    letterSpacing: '0.15em',
+    textTransform: 'uppercase',
+    marginBottom: 8,
+  },
+  archiveDateRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '12px 14px',
+    background: 'rgba(255,255,255,0.02)',
+    border: '1px solid rgba(255,255,255,0.05)',
+    borderRadius: 12,
+    marginBottom: 6,
+    cursor: 'pointer',
+  },
+  nav: {
+    position: 'fixed',
+    bottom: 0,
+    left: '50%',
+    transform: 'translateX(-50%)',
+    width: '100%',
+    maxWidth: 420,
+    background: 'rgba(8,8,8,0.95)',
+    borderTop: '1px solid rgba(255,255,255,0.06)',
+    backdropFilter: 'blur(20px)',
+    display: 'flex',
+    padding: '8px 0 max(8px, env(safe-area-inset-bottom))',
+    zIndex: 100,
+  },
+  navBtn: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: 4,
+    padding: '8px 0',
+    background: 'none',
+    border: 'none',
+    color: '#374151',
+    cursor: 'pointer',
+    position: 'relative',
+    transition: 'color 0.2s',
+    fontFamily: 'inherit',
+  },
+  navBtnActive: { color: '#f1f5f9' },
+  navLabel: { fontSize: 9, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' },
+  navIndicator: {
+    position: 'absolute',
+    top: 0,
+    left: '50%',
+    transform: 'translateX(-50%)',
+    width: 24,
+    height: 2,
+    background: '#f1f5f9',
+    borderRadius: 2,
+  },
+  overlay: {
+    position: 'fixed',
+    inset: 0,
+    background: 'rgba(0,0,0,0.85)',
+    backdropFilter: 'blur(8px)',
+    zIndex: 200,
+    display: 'flex',
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+    padding: '0 16px 24px',
+  },
+  modal: {
+    width: '100%',
+    maxWidth: 400,
+    background: '#111111',
+    border: '1px solid rgba(255,255,255,0.09)',
+    borderRadius: '24px 24px 20px 20px',
+    padding: '20px 24px 28px',
+  },
+  modalHandle: {
+    width: 36,
+    height: 4,
+    background: 'rgba(255,255,255,0.12)',
+    borderRadius: 2,
+    margin: '0 auto 20px',
+  },
+  modalTitle: { fontSize: 18, fontWeight: 700, marginBottom: 4 },
+  modalSub: { fontSize: 12, color: '#4b5563', marginBottom: 18, letterSpacing: '0.02em' },
+  modalCreateBtn: {
+    flex: 1,
+    padding: '13px 0',
+    background: '#1d4ed8',
+    border: 'none',
+    borderRadius: 14,
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 700,
+    fontFamily: 'inherit',
+    cursor: 'pointer',
+    letterSpacing: '0.05em',
+  },
+  modalCancelBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    background: 'rgba(255,255,255,0.05)',
+    border: '1px solid rgba(255,255,255,0.08)',
+    color: '#6b7280',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+};
+
+const css = `
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap');
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #080808; }
+  .fade-in { animation: fadeIn 0.25s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+  .modal-in { animation: modalIn 0.28s cubic-bezier(0.34,1.56,0.64,1); }
+  @keyframes modalIn { from { transform: translateY(60px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+  .pulse-input:focus { border-color: rgba(29,78,216,0.5) !important; background: rgba(255,255,255,0.06) !important; }
+  .pulse-input::placeholder { color: #374151; }
+  .icon-btn:hover { filter: brightness(1.15); transform: scale(1.03); }
+  .icon-btn:active { transform: scale(0.97); }
+  .todo-item:hover { background: rgba(255,255,255,0.05) !important; }
+  .habit-item:hover { border-color: rgba(255,255,255,0.12) !important; }
+  .trash-btn:hover { color: #ef4444 !important; }
+  .nav-btn:hover { color: #9ca3af !important; }
+  ::-webkit-scrollbar { width: 0; }
+`;
